@@ -32,6 +32,15 @@
     .stage-top .formula {
       font-family: var(--mono); font-size: 12.5px; color: var(--muted);
     }
+    /* вкладки вид 2D/3D */
+    .view-tabs { display: flex; gap: 6px; margin: 0 0 12px; }
+    .vtab {
+      font: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+      padding: 8px 16px; border-radius: 10px; transition: border-color .15s, color .15s, box-shadow .15s;
+    }
+    .vtab:hover { border-color: var(--line-strong); color: var(--ink); }
+    .vtab.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   </style>
 </head>
 <body>
@@ -80,6 +89,20 @@
           <div class="hint">Доля сохранённой скорости. Больше β — «тяжелее шар», дольше разгон и инерция.</div>
         </div>
 
+        <div class="control" id="batchCtrl" style="display:none">
+          <label for="batch">Режим градиента</label>
+          <select id="batch">
+            <option value="full">Полный — точный градиент</option>
+            <option value="mini">Мини-батч</option>
+            <option value="sgd">Стохастический (макс. шум)</option>
+          </select>
+          <div class="hint">Меньше батч — шумнее шаг. На «Линейной регрессии» это реальная подвыборка данных; на остальных функциях — имитация шума стохастического градиента.</div>
+        </div>
+        <div class="control" id="bsCtrl" style="display:none">
+          <label for="batchSize">Размер батча <span class="val" id="batchSizeVal">8</span></label>
+          <input type="range" id="batchSize" min="1" max="32" step="1" value="8" />
+        </div>
+
         <div class="control">
           <label for="speed">Скорость анимации <span class="val" id="speedVal">35</span></label>
           <input type="range" id="speed" min="1" max="100" step="1" value="35" />
@@ -108,25 +131,30 @@
       </aside>
 
       <section class="stage">
+        <div class="view-tabs">
+          <button class="vtab active" data-view="2d">Линии уровня · 2D</button>
+          <button class="vtab" data-view="3d">Поверхность · 3D</button>
+        </div>
         <div class="stage-top">
           <span class="meth-tag idle" id="methTag">старт задан</span>
           <span class="formula" id="formula"></span>
         </div>
         <div class="canvas-host">
           <canvas id="canvas"></canvas>
-          <div class="canvas-hint">Клик по полю — задать стартовую точку</div>
+          <div class="canvas-hint" id="hint">Клик по полю — задать стартовую точку</div>
         </div>
         <div class="legend">
           <span><i class="dot" style="background:#4f46e5"></i> траектория спуска</span>
           <span><i class="dot" style="background:#ef4444"></i> текущая точка</span>
           <span><i class="dot" style="background:#10b981"></i> минимум функции</span>
-          <span style="color:var(--faint)">заливка + изолинии — рельеф L(x,y)</span>
+          <span style="color:var(--faint)" id="legendNote">заливка + изолинии — рельеф L(x,y)</span>
         </div>
       </section>
     </div>
   </main>
 
   <script src="gd.js"></script>
+  <script src="gd3d.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

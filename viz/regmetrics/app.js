@@ -1,364 +1,260 @@
-/* UI и отрисовка «Метрик регрессии»: облако точек вокруг прямой с одним
-   управляемым выбросом, линии OLS (min MSE) и робастная (min MAE), остатки,
-   и бар-чарт метрик MAE/MSE/RMSE/R²/MAPE (точные формулы недели 1).
-   Выброс можно тащить мышью или ползунками; «Запуск» гонит его снизу вверх. */
+/* «Насколько мы промахнулись? MAE / MSE / RMSE» — детски-понятная страница.
+   Угадываем вес арбузов (ŷ), кладём на весы (y), промах e=y−ŷ превращаем
+   в ошибку и собираем в метрику. Объект ↔ строка ↔ точка ↔ слагаемое связаны
+   подсветкой при наведении. Чистый vanilla JS, без зависимостей. */
 (function () {
   "use strict";
 
-  const ACCENT = "#4f46e5";   // OLS / точки
-  const RED = "#ef4444";      // остатки
-  const GREEN = "#10b981";    // линия MAE
-  const AMBER = "#f59e0b";    // выброс
-  const FAINT = "#8a93a3";
+  const MAE_C = "#10b981", MSE_C = "#4f46e5", RMSE_C = "#8b5cf6";
+  const GUESS_C = "#0ea5e9", REAL_C = "#334155";
+  const $ = (s) => document.querySelector(s);
 
-  const $ = (id) => document.getElementById(id);
-  const canvas = $("canvas"), ctx = canvas.getContext("2d");
-  const barCv = $("bars"), bctx = barCv.getContext("2d");
+  const state = { n: 8, seed: 7, view: "bars", dropOut: false, hover: -1, pinned: -1, shown: -1 };
+  let DATA = [];     // [{i,g,y,e,ae,se}]
+  let OUT = -1;      // индекс грубого промаха
 
-  const pointsRange = $("points"), pointsVal = $("pointsVal");
-  const noiseRange = $("noise"), noiseVal = $("noiseVal");
-  const outYRange = $("outY"), outYVal = $("outYVal");
-  const outXRange = $("outX"), outXVal = $("outXVal");
-  const maeToggle = $("maeToggle");
-  const playBtn = $("play"), stepBtn = $("step"), resetBtn = $("reset"), regenBtn = $("regen");
-
-  const PAD = 18;
-  let W = 0, H = 0, BW = 0, BH = 0;
-  let seed = 7;
-  let base = null;          // базовая выборка без выброса {points, outlierIndex, trueLine}
-  let pts = [];             // текущая выборка (с применённым выбросом)
-  let oi = 0;               // индекс точки-выброса
-  let playing = false, lastT = 0;
-  let dragging = false;
-
-  // экранная рамка по данным: x ∈ [0,1] фиксирован, y — динамический (под выброс)
-  let view = { ymin: 0, ymax: 1 };
-
-  /* ---------- геометрия canvas (DPR + квадрат) ---------- */
-  function plot() { const size = Math.min(W, H) - 2 * PAD; return { size, ox: (W - size) / 2, oy: (H - size) / 2 }; }
-  const toPX = (x) => { const p = plot(); return p.ox + x * p.size; };
-  const toPY = (y) => {
-    const p = plot();
-    const t = (y - view.ymin) / (view.ymax - view.ymin || 1);
-    return p.oy + (1 - t) * p.size;     // y растёт вверх
-  };
-  const fromPX = (px) => { const p = plot(); return (px - p.ox) / (p.size || 1); };
-  const fromPY = (py) => { const p = plot(); const t = 1 - (py - p.oy) / (p.size || 1); return view.ymin + t * (view.ymax - view.ymin); };
-
-  function sizeCanvas(cv, c) {
-    const r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
-    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
-    c.setTransform(dpr, 0, 0, dpr, 0, 0); return { w: r.width, h: r.height };
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
   }
+  // генерируем n арбузов: факт y (5..12 кг), угадал g; у одного — грубый промах ±7 кг
+  function generate() {
+    const rng = mulberry32(state.seed), n = state.n;
+    DATA = []; OUT = Math.floor(rng() * n);
+    for (let i = 0; i < n; i++) {
+      const y = 5 + Math.floor(rng() * 8);
+      let g;
+      if (i === OUT) g = (y >= 8) ? y - 7 : y + 7;        // явный промах на 7 кг
+      else g = y + (Math.round(rng() * 4) - 2);           // обычный промах −2..+2
+      g = Math.max(1, Math.min(15, g));
+      const e = y - g;
+      DATA.push({ i, g, y, e, ae: Math.abs(e), se: e * e });
+    }
+  }
+
+  const active = () => DATA.filter((d) => !(state.dropOut && d.i === OUT));
+  function metricsOf(arr) {
+    const n = arr.length;
+    const sae = arr.reduce((s, d) => s + d.ae, 0), sse = arr.reduce((s, d) => s + d.se, 0);
+    return { n, sae, sse, mae: sae / n, mse: sse / n, rmse: Math.sqrt(sse / n) };
+  }
+  const metrics = () => metricsOf(active());
+  const fmt = (v) => String(Math.round(v * 100) / 100);
+
+  // ---------- грядка ----------
+  let cards = [];
+  function renderShelf() {
+    const shelf = $("#shelf"); shelf.innerHTML = ""; cards = [];
+    DATA.forEach((d) => {
+      const el = document.createElement("div");
+      el.className = "melon" + (state.dropOut && d.i === OUT ? " dim" : "");
+      el.dataset.i = d.i;
+      const badge = d.e === 0 ? "🎯 точно" : (d.e > 0 ? "+" : "−") + d.ae + " кг";
+      const badgeBg = d.e === 0 ? "#dcfce7" : d.e > 0 ? "#e0f2fe" : "#fef3c7";
+      const badgeCol = d.e === 0 ? "#15803d" : d.e > 0 ? "#0369a1" : "#b45309";
+      el.innerHTML =
+        `<div class="miss" style="background:${badgeBg};color:${badgeCol}">${badge}</div>` +
+        `<div class="emoji">🍉</div><div class="num">№${d.i + 1}</div>` +
+        `<div class="guess">угадал ${d.g}</div><div class="real">весы ${d.y}</div>`;
+      el.addEventListener("mouseenter", () => setHover(d.i));
+      el.addEventListener("mouseleave", () => setHover(-1));
+      el.addEventListener("click", () => setPin(d.i));
+      shelf.appendChild(el); cards[d.i] = el;
+    });
+  }
+
+  // ---------- таблица ----------
+  let rows = [];
+  function renderTable() {
+    const tb = $("#tbody"); tb.innerHTML = ""; rows = [];
+    DATA.forEach((d) => {
+      const tr = document.createElement("tr");
+      tr.dataset.i = d.i;
+      if (state.dropOut && d.i === OUT) tr.className = "dim";
+      const sgn = d.e > 0 ? "pos" : d.e < 0 ? "neg" : "zero";
+      const eTxt = d.e > 0 ? "+" + d.e : d.e === 0 ? "0 🎯" : String(d.e);
+      tr.innerHTML =
+        `<td class="obj">🍉 №${d.i + 1}</td><td>${d.g}</td><td>${d.y}</td>` +
+        `<td class="${sgn}">${eTxt}</td><td class="mae">${d.ae}</td><td class="mse">${d.se}</td>`;
+      tr.addEventListener("mouseenter", () => setHover(d.i));
+      tr.addEventListener("mouseleave", () => setHover(-1));
+      tr.addEventListener("click", () => setPin(d.i));
+      tb.appendChild(tr); rows[d.i] = tr;
+    });
+    const m = metrics();
+    const sum = document.createElement("tr"); sum.className = "sum";
+    sum.innerHTML = `<td class="obj">Σ сумма (÷${m.n})</td><td></td><td></td><td></td>` +
+      `<td class="mae">${m.sae}</td><td class="mse">${m.sse}</td>`;
+    tb.appendChild(sum);
+  }
+
+  // ---------- сборка метрик ----------
+  let maeTerms = [], mseTerms = [];
+  function terms(field, color) {
+    return active().map((d) =>
+      `<span class="term" data-i="${d.i}" style="color:${color}">${d[field]}</span>`).join(" + ");
+  }
+  function renderMetrics() {
+    const m = metrics();
+    const big = active().reduce((a, d) => (d.ae > a.ae ? d : a), active()[0]); // крупнейший промах
+    $("#metrics").innerHTML =
+      `<div class="mrow"><div class="mhead"><span class="mname mae-c">MAE</span>
+        <span class="mdesc">средняя длина промаха — на сколько килограммов ошибаемся в среднем</span></div>
+        <div class="sum">|e|:&nbsp; ${terms("ae", MAE_C)} = <b>${m.sae}</b> &nbsp;÷&nbsp;${m.n} =
+        <span class="res mae-c">${fmt(m.mae)} кг</span></div></div>` +
+
+      `<div class="mrow"><div class="mhead"><span class="mname mse-c">MSE</span>
+        <span class="mdesc">средняя площадь квадрата — крупный промах раздувается (в кг²)</span></div>
+        <div class="sum">e²:&nbsp; ${terms("se", MSE_C)} = <b>${m.sse}</b> &nbsp;÷&nbsp;${m.n} =
+        <span class="res mse-c">${fmt(m.mse)} кг²</span></div>
+        <div class="mdesc" style="margin-top:7px">⚖️ промах <b>${big.ae} кг</b> (арбуз №${big.i + 1}): в MAE весит <b style="color:#10b981">${big.ae}</b>, а в MSE — <b style="color:#4f46e5">${big.se}</b> (${big.ae} в квадрате). Вот почему MSE так боится больших промахов.</div></div>` +
+
+      `<div class="mrow"><div class="mhead"><span class="mname rmse-c">RMSE</span>
+        <span class="mdesc">длинный корень над всей суммой квадратов ÷ n — возвращает килограммы</span></div>
+        <div class="sum" style="line-height:2.5">RMSE =
+          <span class="sqrt rmse-c"><span class="sign">√</span><span class="rad"><span style="color:#4f46e5">${active().map((d) => d.se).join(" + ")}</span><span style="color:#64748b">&nbsp;÷&nbsp;${m.n}</span></span></span>
+          = √${fmt(m.mse)} = <span class="res rmse-c">${fmt(m.rmse)} кг</span></div>
+        <div class="mdesc" style="margin-top:7px">— как MAE, но квадраты под корнем «помнят» крупный промах, поэтому RMSE строже.</div></div>`;
+    maeTerms = []; mseTerms = [];
+    $("#metrics").querySelectorAll(".mrow:nth-child(1) .term").forEach((t) => { maeTerms[+t.dataset.i] = t; bindTerm(t); });
+    $("#metrics").querySelectorAll(".mrow:nth-child(2) .term").forEach((t) => { mseTerms[+t.dataset.i] = t; bindTerm(t); });
+  }
+  function bindTerm(t) {
+    t.addEventListener("mouseenter", () => setHover(+t.dataset.i));
+    t.addEventListener("mouseleave", () => setHover(-1));
+    t.addEventListener("click", () => setPin(+t.dataset.i));
+  }
+
+  function renderVerdict() {
+    const all = metricsOf(DATA), cut = metricsOf(DATA.filter((d) => d.i !== OUT));
+    const o = DATA[OUT];
+    $("#verdict").innerHTML = state.dropOut
+      ? `Убрали грубый промах (№${OUT + 1}) — и <b>RMSE упал с ${fmt(all.rmse)} до ${fmt(cut.rmse)} кг</b>, а <b>MAE едва дрогнул: ${fmt(all.mae)} → ${fmt(cut.mae)} кг</b>. Видишь? Квадрат «помнит» большой промах куда сильнее. Поэтому RMSE/MSE — строгие судьи, а MAE — спокойный.`
+      : `В среднем мы мажем на <b>MAE = ${fmt(all.mae)} кг</b>. Но арбуз №${OUT + 1} (мимо на ${o.ae} кг) раздувает квадраты, и <b>RMSE = ${fmt(all.rmse)} кг</b> заметно больше. Поставь галочку «убрать грубый промах» — RMSE резко просядет, а MAE почти нет.`;
+  }
+
+  // ---------- подсветка (объект ↔ строка ↔ точка ↔ слагаемое), с закреплением по клику ----------
+  function effIndex() { return state.pinned >= 0 ? state.pinned : state.hover; }
+  function applyHL(i) {
+    if (i !== state.shown) {
+      const off = (arr) => { const el = arr[state.shown]; if (el) el.classList.remove("hl"); };
+      off(cards); off(rows); off(maeTerms); off(mseTerms);
+      state.shown = i;
+      const on = (arr) => { const el = arr[i]; if (el) el.classList.add("hl"); };
+      if (i >= 0) { on(cards); on(rows); on(maeTerms); on(mseTerms); }
+    }
+    drawChart(); drawCurves();
+  }
+  function setHover(i) { state.hover = i; if (state.pinned < 0) applyHL(i); }
+  function setPin(i) { state.pinned = (state.pinned === i) ? -1 : (i >= 0 ? i : -1); applyHL(effIndex()); }
+
+  // ---------- график ----------
+  const canvas = $("#chart"), ctx = canvas.getContext("2d");
+  let W = 0, H = 0;
   function resize() {
-    const a = sizeCanvas(canvas, ctx); W = a.w; H = a.h;
-    const b = sizeCanvas(barCv, bctx); BW = b.w; BH = b.h;
-    render();
+    const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    W = r.width; H = r.height; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawChart();
   }
+  const PAD = { l: 40, r: 14, t: 16, b: 38 };
+  function plot() { return { x: PAD.l, y: PAD.t, w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }; }
+  const YMAX = 16;
+  function colX(i) { const p = plot(); return p.x + (i + 0.5) / DATA.length * p.w; }
+  function pyKg(v) { const p = plot(); return p.y + p.h - v / YMAX * p.h; }
+  function pxPerKg() { const p = plot(); return p.h / YMAX; }
 
-  /* ---------- данные ---------- */
-  function regenData() {
-    base = window.RegMetrics.generate(+pointsRange.value, +noiseRange.value / 100, seed);
-    oi = base.outlierIndex;
-    pause();
-    applyOutlier();
-  }
-
-  // строим текущую выборку: копия базовой + позиция выброса из ползунков outX/outY
-  function applyOutlier() {
-    if (!base) return;
-    pts = base.points.map((p) => ({ x: p.x, y: p.y }));
-    const ox = +outXRange.value / 100;
-    const dy = +outYRange.value / 10;                 // сдвиг по y от истинной линии, в единицах таргета
-    const tp = base.trueLine;
-    oi = Math.min(pts.length - 1, Math.max(0, oi));
-    if (pts.length) pts[oi] = { x: ox, y: tp.a * ox + tp.b + dy };
-    autoView();
-    render();
-    updateStats();
-  }
-
-  // подбираем вертикальный масштаб под все точки и истинную линию, с небольшим запасом
-  function autoView() {
-    let lo = Infinity, hi = -Infinity;
-    for (const p of pts) { if (p.y < lo) lo = p.y; if (p.y > hi) hi = p.y; }
-    const tp = base.trueLine;
-    for (const x of [0, 1]) { const y = tp.a * x + tp.b; if (y < lo) lo = y; if (y > hi) hi = y; }
-    if (!isFinite(lo) || !isFinite(hi)) { lo = 0; hi = 1; }
-    if (hi - lo < 1e-6) { hi += 0.5; lo -= 0.5; }
-    const pad = (hi - lo) * 0.10;
-    view.ymin = lo - pad; view.ymax = hi + pad;
-  }
-
-  /* ---------- метрики и линии ---------- */
-  function compute() {
-    const ols = window.RegMetrics.fitOLS(pts);
-    const lad = window.RegMetrics.fitLAD(pts);
-    const m = window.RegMetrics.metrics(pts, ols);     // метрики считаем относительно OLS-предсказания
-    return { ols, lad, m };
-  }
-  // метрики «эталонной» (базовой, без выброса) выборки — для нормировки баров
-  function baselineMetrics() {
-    const bp = base.points;
-    const ols = window.RegMetrics.fitOLS(bp);
-    return window.RegMetrics.metrics(bp, ols);
-  }
-
-  /* ---------- отрисовка поля ---------- */
-  function lineY(line, x) { return line.a * x + line.b; }
-
-  function render() {
+  function drawChart() {
+    if (!W) return;
     ctx.clearRect(0, 0, W, H);
-    if (!pts.length) { renderBars(null, null); return; }
-    const { ols, lad, m } = compute();
+    const p = plot(), small = DATA.length > 11;
+    ctx.font = "11px -apple-system, system-ui, sans-serif"; ctx.fillStyle = "#8a93a3"; ctx.strokeStyle = "rgba(20,23,28,.06)";
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= YMAX; v += 4) { const Y = pyKg(v); ctx.beginPath(); ctx.moveTo(p.x, Y); ctx.lineTo(p.x + p.w, Y); ctx.stroke(); ctx.fillText(v + "", p.x - 7, Y); }
+    ctx.save(); ctx.translate(12, p.y + p.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("вес, кг", 0, 0); ctx.restore();
 
-    // остатки от OLS (вертикальные отрезки точка → линия)
-    ctx.lineWidth = 1.4; ctx.strokeStyle = "rgba(239,68,68,.40)";
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const yhat = lineY(ols, p.x);
-      ctx.beginPath();
-      ctx.moveTo(toPX(p.x), toPY(p.y));
-      ctx.lineTo(toPX(p.x), toPY(yhat));
-      ctx.stroke();
+    const sq = state.view === "squares", hi = effIndex();
+    if (sq) { for (const d of DATA) if (d.i !== hi) drawSquare(d, false); if (hi >= 0) drawSquare(DATA[hi], true); }
+
+    const rad = small ? 4 : 5.5;
+    for (const d of DATA) {
+      const dim = (state.dropOut && d.i === OUT) || (hi >= 0 && hi !== d.i);
+      const X = colX(d.i), Yg = pyKg(d.g), Yy = pyKg(d.y);
+      ctx.globalAlpha = dim ? 0.28 : 1;
+      ctx.strokeStyle = d.e === 0 ? "#10b981" : (d.e > 0 ? GUESS_C : "#f59e0b");
+      ctx.lineWidth = d.i === hi ? 4 : 2.5; ctx.beginPath(); ctx.moveTo(X, Yg); ctx.lineTo(X, Yy); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Yy, rad, 0, 7); ctx.fillStyle = REAL_C; ctx.fill();
+      ctx.beginPath(); ctx.arc(X, Yg, rad, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = GUESS_C; ctx.stroke();
+      if (!sq && d.ae > 0 && (!small || d.i === hi)) { ctx.globalAlpha = dim ? 0.3 : 1; ctx.fillStyle = "#475569"; ctx.font = "700 11px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.ae + "", X + 11, (Yg + Yy) / 2); }
+      // ось X: номер арбуза (всегда) + эмодзи
+      ctx.globalAlpha = dim ? 0.45 : 1; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.font = (small ? 11 : 14) + "px -apple-system, sans-serif"; ctx.fillText("🍉", X, p.y + p.h + 19);
+      ctx.fillStyle = d.i === hi ? "#14171c" : "#8a93a3"; ctx.font = (d.i === hi ? "700 " : "") + "11px -apple-system, sans-serif";
+      ctx.fillText(String(d.i + 1), X, p.y + p.h + 33);
+      if (d.i === state.pinned) { ctx.globalAlpha = 1; ctx.font = "13px -apple-system, sans-serif"; ctx.textBaseline = "middle"; ctx.fillText("📌", X, p.y + 11); }
     }
-
-    // истинная линия (серый пунктир)
-    drawLine(base.trueLine, FAINT, 2, [5, 4]);
-    // робастная линия по MAE (зелёный пунктир) — опционально
-    if (maeToggle.value === "on") drawLine(lad, GREEN, 2.4, [6, 4]);
-    // OLS — минимум MSE (сплошной акцент)
-    drawLine(ols, ACCENT, 3, null);
-
-    // точки выборки
-    for (let i = 0; i < pts.length; i++) {
-      if (i === oi) continue;
-      const p = pts[i];
-      ctx.beginPath(); ctx.arc(toPX(p.x), toPY(p.y), 3.8, 0, Math.PI * 2);
-      ctx.fillStyle = ACCENT; ctx.fill();
-    }
-    // выброс — крупная оранжевая точка с гало
-    if (pts[oi]) {
-      const px = toPX(pts[oi].x), py = toPY(pts[oi].y);
-      ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(245,158,11,.22)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(px, py, 5.2, 0, Math.PI * 2);
-      ctx.fillStyle = AMBER; ctx.fill();
-      ctx.lineWidth = 1.6; ctx.strokeStyle = "#fff"; ctx.stroke();
-    }
-
-    renderBars(m, baselineMetrics());
+    ctx.globalAlpha = 1;
+    // легенда
+    ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = "12px -apple-system, sans-serif";
+    let lx = p.x + 6, ly = p.y + 8;
+    ctx.beginPath(); ctx.arc(lx + 5, ly, 5, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.strokeStyle = GUESS_C; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = "#14171c"; ctx.fillText("угадал ŷ", lx + 16, ly); lx += 90;
+    ctx.beginPath(); ctx.arc(lx + 5, ly, 5, 0, 7); ctx.fillStyle = REAL_C; ctx.fill(); ctx.fillText("весы y", lx + 16, ly);
   }
-
-  function drawLine(line, color, width, dash) {
-    // рисуем по краям видимой области x ∈ [0,1], отсекая по рамке canvas не требуется
-    ctx.save();
-    ctx.lineWidth = width; ctx.strokeStyle = color;
-    ctx.setLineDash(dash || []);
-    ctx.beginPath();
-    ctx.moveTo(toPX(0), toPY(lineY(line, 0)));
-    ctx.lineTo(toPX(1), toPY(lineY(line, 1)));
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  /* ---------- бар-чарт метрик ----------
-     Высоту бара берём как отношение метрики к её базовому значению (без выброса),
-     обрезая по разумному потолку — так наглядно, что MSE/RMSE взлетают, а MAE нет.
-     Под каждым баром — подпись и абсолютное число. R²/MAPE рисуем своими шкалами. */
-  function renderBars(m, m0) {
-    bctx.clearRect(0, 0, BW, BH);
-    if (!m) return;
-
-    const items = [
-      { key: "MAE", val: m.mae, ratio: ratio(m.mae, m0.mae), color: GREEN },
-      { key: "MSE", val: m.mse, ratio: ratio(m.mse, m0.mse), color: ACCENT },
-      { key: "RMSE", val: m.rmse, ratio: ratio(m.rmse, m0.rmse), color: ACCENT },
-      { key: "R²", val: m.r2, ratio: r2Bar(m.r2), color: "#0ea5e9", fmt: (v) => v.toFixed(3) },
-      { key: "MAPE", val: m.mape, ratio: ratio(m.mape, m0.mape), color: AMBER, fmt: (v) => v.toFixed(1) + "%" },
-    ];
-
-    const padL = 12, padR = 12, padTop = 14, padBot = 30;
-    const innerW = BW - padL - padR;
-    const innerH = BH - padTop - padBot;
-    const slot = innerW / items.length;
-    const bw = Math.min(46, slot * 0.56);
-    const baseY = BH - padBot;
-
-    // пунктир «×1» — уровень базовой метрики (для масштабных баров)
-    const oneY = baseY - clamp01(1 / MAXR) * innerH;
-    bctx.strokeStyle = "rgba(20,23,28,.14)"; bctx.lineWidth = 1; bctx.setLineDash([4, 4]);
-    bctx.beginPath(); bctx.moveTo(padL, oneY); bctx.lineTo(BW - padR, oneY); bctx.stroke();
-    bctx.setLineDash([]);
-    bctx.fillStyle = "rgba(20,23,28,.32)"; bctx.font = "10px " + monoFont();
-    bctx.textAlign = "left"; bctx.fillText("×1", BW - padR - 16, oneY - 3);
-
-    bctx.textAlign = "center";
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
-      const cx = padL + slot * (i + 0.5);
-      const h = clamp01(it.ratio) * innerH;
-      const y = baseY - h;
-      // бар
-      roundRect(bctx, cx - bw / 2, y, bw, h, 4);
-      bctx.fillStyle = it.color; bctx.fill();
-      // значение сверху
-      bctx.fillStyle = "#14171c"; bctx.font = "600 11.5px " + monoFont();
-      const txt = it.fmt ? it.fmt(it.val) : fmtNum(it.val);
-      bctx.fillText(txt, cx, Math.max(y - 5, padTop + 8));
-      // подпись метрики
-      bctx.fillStyle = "#5b6472"; bctx.font = "11px " + uiFont();
-      bctx.fillText(it.key, cx, BH - 11);
+  function drawSquare(d, hot) {
+    if (d.ae === 0) return;
+    if (state.dropOut && d.i === OUT) return;
+    const p = plot(), X = colX(d.i), side = d.ae * pxPerKg();
+    const topY = pyKg(Math.max(d.g, d.y));
+    const dir = (X + side > p.x + p.w) ? -1 : 1;
+    const x0 = dir > 0 ? X : X - side;
+    ctx.fillStyle = hot ? "rgba(79,70,229,.34)" : "rgba(79,70,229,.15)";
+    ctx.fillRect(x0, topY, side, side);
+    ctx.strokeStyle = hot ? "#4f46e5" : "rgba(79,70,229,.4)"; ctx.lineWidth = hot ? 2 : 1; ctx.strokeRect(x0, topY, side, side);
+    if (hot) {
+      ctx.strokeStyle = "rgba(79,70,229,.35)"; ctx.lineWidth = 0.6; const u = pxPerKg();
+      for (let k = 1; k < d.ae; k++) {
+        ctx.beginPath(); ctx.moveTo(x0 + k * u, topY); ctx.lineTo(x0 + k * u, topY + side); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x0, topY + k * u); ctx.lineTo(x0 + side, topY + k * u); ctx.stroke();
+      }
+      ctx.fillStyle = "#4f46e5"; ctx.font = "700 12px -apple-system, sans-serif"; ctx.textBaseline = "bottom";
+      ctx.textAlign = dir > 0 ? "left" : "right";
+      ctx.fillText(d.ae + "×" + d.ae + " = " + d.se, dir > 0 ? x0 + 3 : x0 + side - 3, topY - 3);
     }
   }
+  function nearest(mx) {
+    let best = -1, bd = 1e9; for (const d of DATA) { const dd = Math.abs(mx - colX(d.i)); if (dd < bd) { bd = dd; best = d.i; } }
+    return bd < plot().w / DATA.length / 1.4 ? best : -1;
+  }
+  canvas.style.cursor = "pointer";
+  canvas.addEventListener("mousemove", (e) => { const r = canvas.getBoundingClientRect(); setHover(nearest(e.clientX - r.left)); });
+  canvas.addEventListener("mouseleave", () => setHover(-1));
+  canvas.addEventListener("click", (e) => { const r = canvas.getBoundingClientRect(); setPin(nearest(e.clientX - r.left)); });
 
-  const MAXR = 6;   // потолок отношения для баров (6× от базовой метрики)
-  function ratio(v, v0) { if (!(v0 > 1e-9)) return v > 1e-9 ? MAXR : 0; return v / v0; }
-  function clamp01(x) { return Math.max(0, Math.min(1, x / MAXR)); }
-  // R²: рисуем «заполненность» от 0 (низ) до 1 (верх), отрицательный R² — пустой бар
-  function r2Bar(r2) { return Math.max(0, Math.min(1, r2)) * MAXR; }
+  // ---------- управление ----------
+  function renderAll() { renderShelf(); renderTable(); renderMetrics(); renderVerdict(); drawChart(); }
+  function rebuild() { generate(); state.hover = -1; renderAll(); }
 
-  function roundRect(c, x, y, w, h, r) {
-    if (h < 0.5) { c.beginPath(); c.rect(x, y, w, 0.5); return; }
-    r = Math.min(r, w / 2, h / 2);
-    c.beginPath();
-    c.moveTo(x + r, y); c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
-    c.lineTo(x + w, y + h); c.lineTo(x, y + h); c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r);
-    c.closePath();
-  }
-  function monoFont() { return 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'; }
-  function uiFont() { return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'; }
-  function fmtNum(v) {
-    const a = Math.abs(v);
-    if (a >= 100) return v.toFixed(0);
-    if (a >= 10) return v.toFixed(1);
-    if (a >= 1) return v.toFixed(2);
-    return v.toFixed(3);
-  }
-
-  /* ---------- статистика-плитки ---------- */
-  function updateStats() {
-    if (!pts.length) return;
-    const { ols, m } = compute();
-    $("statMAE").textContent = fmtNum(m.mae);
-    $("statMSE").textContent = fmtNum(m.mse);
-    $("statRMSE").textContent = fmtNum(m.rmse);
-    $("statR2").textContent = m.r2.toFixed(3);
-    $("statMAPE").textContent = m.mape.toFixed(1) + "%";
-    // абсолютная ошибка самого выброса от OLS-линии: |yᵢ − ŷᵢ|
-    const p = pts[oi];
-    const err = p ? Math.abs(p.y - (ols.a * p.x + ols.b)) : 0;
-    $("statErr").textContent = fmtNum(err);
-  }
-
-  /* ---------- авто-проводка выброса (play) ---------- */
-  function play() {
-    // если выброс уже у потолка — начнём снизу
-    if (+outYRange.value >= +outYRange.max) outYRange.value = +outYRange.min;
-    playing = true; updatePlayBtn();
-  }
-  function pause() { playing = false; updatePlayBtn(); }
-  function togglePlay() { playing ? pause() : play(); }
-  function updatePlayBtn() {
-    playBtn.innerHTML = playing
-      ? '<svg width="13" height="13" viewBox="0 0 12 12"><rect x="2" y="1.5" width="3" height="9" rx="1" fill="currentColor"/><rect x="7" y="1.5" width="3" height="9" rx="1" fill="currentColor"/></svg> Пауза'
-      : '<svg width="13" height="13" viewBox="0 0 12 12"><path d="M3 1.5l7 4.5-7 4.5z" fill="currentColor"/></svg> Запуск';
-  }
-  function stepOutlier() {
-    const next = Math.min(+outYRange.max, +outYRange.value + 2);
-    outYRange.value = next; syncLabels(); applyOutlier();
-  }
-
-  function loop(t) {
-    requestAnimationFrame(loop);
-    if (!lastT) lastT = t;
-    const dt = t - lastT; lastT = t;
-    if (playing) {
-      const speed = 22;                       // единиц ползунка в секунду
-      let v = +outYRange.value + speed * (dt / 1000);
-      if (v >= +outYRange.max) { v = +outYRange.max; pause(); }
-      outYRange.value = v; syncLabels(); applyOutlier();
-    }
-  }
-
-  /* ---------- перетаскивание выброса мышью ---------- */
-  function hitOutlier(px, py) {
-    if (!pts[oi]) return false;
-    const dx = px - toPX(pts[oi].x), dy = py - toPY(pts[oi].y);
-    return dx * dx + dy * dy <= 13 * 13;
-  }
-  function pointerPos(e) {
-    const r = canvas.getBoundingClientRect();
-    return { px: e.clientX - r.left, py: e.clientY - r.top };
-  }
-  canvas.addEventListener("pointerdown", (e) => {
-    const { px, py } = pointerPos(e);
-    if (hitOutlier(px, py)) {
-      dragging = true; pause();
-      canvas.setPointerCapture(e.pointerId);
-      moveOutlierTo(px, py);
-    }
+  $("#viewSeg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    $("#viewSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    state.view = b.dataset.view; drawChart();
+  }));
+  $("#dropOut").addEventListener("change", (e) => {
+    state.dropOut = e.target.checked; renderShelf(); renderTable(); renderMetrics(); renderVerdict(); drawChart();
   });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    const { px, py } = pointerPos(e);
-    moveOutlierTo(px, py);
+  $("#count").addEventListener("input", (e) => {
+    state.n = +e.target.value; $("#countVal").textContent = e.target.value;
+    state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
-  function endDrag(e) { if (dragging) { dragging = false; try { canvas.releasePointerCapture(e.pointerId); } catch (_) {} } }
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
-
-  // перевод позиции курсора → ползунки outX/outY (через сдвиг от истинной линии)
-  function moveOutlierTo(px, py) {
-    const x = Math.max(0.02, Math.min(0.98, fromPX(px)));
-    const y = fromPY(py);
-    const tp = base.trueLine;
-    const dy = y - (tp.a * x + tp.b);
-    outXRange.value = Math.round(x * 100);
-    // ограничиваем dy диапазоном ползунка, но даём перетащить шире за счёт авто-вью
-    let dySlider = Math.round(dy * 10);
-    dySlider = Math.max(+outYRange.min, Math.min(+outYRange.max, dySlider));
-    outYRange.value = dySlider;
-    syncLabels(); applyOutlier();
-  }
-
-  /* ---------- лейблы и сброс ---------- */
-  function syncLabels() {
-    pointsVal.textContent = pointsRange.value;
-    noiseVal.textContent = (+noiseRange.value / 100).toFixed(2);
-    const dy = +outYRange.value / 10;
-    outYVal.textContent = (dy >= 0 ? "+" : "") + dy.toFixed(1);
-    outXVal.textContent = (+outXRange.value / 100).toFixed(2);
-  }
-  function resetOutlier() {
-    pause();
-    outYRange.value = 0; outXRange.value = 50;
-    syncLabels(); applyOutlier();
-  }
-
-  /* ---------- события ---------- */
-  pointsRange.addEventListener("input", () => { syncLabels(); regenData(); });
-  noiseRange.addEventListener("input", () => { syncLabels(); regenData(); });
-  outYRange.addEventListener("input", () => { pause(); syncLabels(); applyOutlier(); });
-  outXRange.addEventListener("input", () => { pause(); syncLabels(); applyOutlier(); });
-  maeToggle.addEventListener("change", render);
-  playBtn.addEventListener("click", togglePlay);
-  stepBtn.addEventListener("click", () => { pause(); stepOutlier(); });
-  resetBtn.addEventListener("click", resetOutlier);
-  regenBtn.addEventListener("click", () => { seed = (seed * 1103515245 + 12345) >>> 0; regenData(); });
-
-  window.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
-    if (e.code === "Space") { e.preventDefault(); togglePlay(); }
-    else if (e.code === "ArrowRight") { pause(); stepOutlier(); }
-    else if (e.key === "r" || e.key === "R" || e.key === "к" || e.key === "К") resetOutlier();
-    else if (e.key === "n" || e.key === "N" || e.key === "т" || e.key === "Т") { seed = (seed * 1103515245 + 12345) >>> 0; regenData(); }
+  $("#newData").addEventListener("click", () => {
+    state.seed = (state.seed * 1103515245 + 12345) >>> 0;
+    state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
   window.addEventListener("resize", resize);
 
-  updatePlayBtn();
-  syncLabels();
-  resize();
-  regenData();
-  requestAnimationFrame(loop);
+  // ---------- старт ----------
+  generate(); renderShelf(); renderTable(); renderMetrics(); renderVerdict(); resize();
 })();

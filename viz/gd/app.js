@@ -18,6 +18,8 @@
   const playBtn = $("play"), stepBtn = $("step"), resetBtn = $("reset"), regenBtn = $("regen");
   const progressBar = $("progressBar");
   const methTag = $("methTag"), formulaEl = $("formula");
+  const batchCtrl = $("batchCtrl"), batchSel = $("batch"), bsCtrl = $("bsCtrl"), bsRange = $("batchSize"), bsVal = $("batchSizeVal");
+  const hintEl = $("hint"), legendNote = $("legendNote");
 
   let fn = null;            // текущая функция потерь (объект из GD.funcs)
   let gd = null;            // текущий степпер
@@ -26,6 +28,11 @@
   let playing = false, acc = 0, lastT = 0, seed = 7;
   let W = 0, H = 0;
   const PAD = 16;
+
+  let view = "2d";              // "2d" | "3d"
+  let grid3d = null;            // кэш 3D-сетки (GD3D.buildGrid)
+  const cam = { yaw: -0.7, elev: 0.95 };
+  let dragRot = null;           // {x,y} при вращении 3D
 
   // ---- кэш рельефа: поле + сетка значений L (для heatmap и изолиний) ----
   let fieldCanvas = null;   // offscreen с залитым heatmap'ом
@@ -81,9 +88,12 @@
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     return { w: r.width, h: r.height };
   }
+  function build3D() { if (fn) grid3d = GD3D.buildGrid(fn, 42); }
+
   function resize() {
     const a = sizeCanvas(canvas, ctx); W = a.w; H = a.h;
     buildField();
+    if (!grid3d) build3D();
     render();
   }
 
@@ -193,6 +203,9 @@
       method: methodSel.value,
       beta: betaFromSlider(),
       start: { u: start.u, v: start.v },
+      batchMode: batchSel.value,
+      batchSize: +bsRange.value,
+      seed: (seed ^ 0x9e3779b9) >>> 0,
     });
     bestL = gd.L;
     pause();
@@ -259,6 +272,17 @@
 
   /* ------------------------------ отрисовка ------------------------------ */
   function render() {
+    if (view === "3d") { render3D(); return; }
+    render2D();
+  }
+
+  function render3D() {
+    ctx.clearRect(0, 0, W, H);
+    if (!fn || !grid3d || W <= 0) return;
+    GD3D.render(ctx, grid3d, fn, gd, cam, W, H);
+  }
+
+  function render2D() {
     ctx.clearRect(0, 0, W, H);
     if (!fn) return;
     const p = plot();
@@ -343,6 +367,36 @@
       // стрелка антиградиента из текущей точки (направление шага)
       if (!gd.done && inField(lx, ly, p)) drawGradArrow(last, cx, cy, p);
     }
+
+    // мини-график данных для линейной регрессии
+    if (fn.isData) drawDataInset(p);
+  }
+
+  // мини-график данных (линейная регрессия): точки + текущая прямая y=w·x+b;
+  // точки использованного мини-батча подсвечены красным.
+  function drawDataInset(p) {
+    const iw = Math.min(196, p.size * 0.44), ih = iw * 0.7;
+    const ix = p.ox + 10, iy = p.oy + p.size - ih - 10;
+    ctx.fillStyle = "rgba(255,255,255,.93)"; roundRectPath(ctx, ix, iy, iw, ih, 8); ctx.fill();
+    ctx.strokeStyle = "rgba(20,23,28,.14)"; ctx.lineWidth = 1; ctx.stroke();
+    const X = fn.X, Y = fn.Y, n = fn.n;
+    let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    for (let i = 0; i < n; i++) { if (X[i] < xmin) xmin = X[i]; if (X[i] > xmax) xmax = X[i]; if (Y[i] < ymin) ymin = Y[i]; if (Y[i] > ymax) ymax = Y[i]; }
+    const pc = 10;
+    const dx = (x) => ix + pc + (x - xmin) / (xmax - xmin || 1) * (iw - 2 * pc);
+    const dy = (y) => iy + ih - pc - (y - ymin) / (ymax - ymin || 1) * (ih - 2 * pc);
+    const clampY = (yy) => Math.max(iy + 2, Math.min(iy + ih - 2, yy));
+    const cur = gd && gd.path.length ? gd.path[gd.path.length - 1] : { u: start.u, v: start.v };
+    ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(dx(xmin), clampY(dy(cur.u * xmin + cur.v))); ctx.lineTo(dx(xmax), clampY(dy(cur.u * xmax + cur.v))); ctx.stroke();
+    const batch = gd && gd.lastBatch ? new Set(gd.lastBatch) : null;
+    for (let i = 0; i < n; i++) {
+      const inB = batch && batch.has(i);
+      ctx.beginPath(); ctx.arc(dx(X[i]), dy(Y[i]), inB ? 3.8 : 2.2, 0, Math.PI * 2);
+      ctx.fillStyle = inB ? "#ef4444" : "rgba(51,65,85,.5)"; ctx.fill();
+    }
+    ctx.fillStyle = "#5b6472"; ctx.font = "10px -apple-system, system-ui, sans-serif"; ctx.textAlign = "left";
+    ctx.fillText("данные: y = w·x + b", ix + 9, iy + 14);
   }
 
   // стрелка −∇L (направление следующего шага), нормированной длины
@@ -482,7 +536,27 @@
   /* ------------------------------ контролы ------------------------------ */
   function syncFuncUI() {
     funcNote.textContent = fn.note;
-    formulaEl.textContent = FORMULA[fn.id] || "";
+    formulaEl.textContent = fn.formula || FORMULA[fn.id] || "";
+  }
+  // показать/спрятать батч-контролы (только для функции на данных)
+  function updateBatchUI() {
+    batchCtrl.style.display = "";                 // батч-режим доступен на любой функции
+    bsCtrl.style.display = batchSel.value === "mini" ? "" : "none";
+    const maxB = fn.isData ? fn.n : 32;
+    bsRange.max = maxB;
+    if (+bsRange.value > maxB) bsRange.value = Math.min(8, maxB);
+    bsVal.textContent = bsRange.value;
+  }
+  function setView(v) {
+    view = v;
+    document.querySelectorAll(".vtab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
+    hintEl.textContent = v === "3d"
+      ? "Тяни мышью — повернуть поверхность"
+      : (fn && fn.isData ? "Клик — задать стартовые (w, b)" : "Клик по полю — задать стартовую точку");
+    legendNote.textContent = v === "3d"
+      ? "поверхность L — высота = потери (лог-сжатие), красная нить — путь спуска"
+      : "заливка + изолинии — рельеф L(x,y)";
+    render();
   }
   function syncLabels() {
     lrVal.textContent = fmtLR(sliderToLR());
@@ -495,9 +569,12 @@
     fn = GD.funcs[funcSel.value];
     start = { u: fn.start.u, v: fn.start.v };
     lrRange.value = lrToSlider(fn.lr0); // ставим рекомендованный lr
+    updateBatchUI();
     syncFuncUI();
     syncLabels();
     buildField();
+    build3D();
+    setView(view); // обновить подсказку под тип функции
     rebuild();
   }
 
@@ -520,8 +597,13 @@
   resetBtn.addEventListener("click", rebuild);
   regenBtn.addEventListener("click", newStart);
 
-  // клик по полю — задать стартовую точку
+  document.querySelectorAll(".vtab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
+  batchSel.addEventListener("change", () => { updateBatchUI(); rebuild(); });
+  bsRange.addEventListener("input", () => { bsVal.textContent = bsRange.value; rebuild(); });
+
+  // клик по полю (только 2D) — задать стартовую точку
   canvas.addEventListener("click", (e) => {
+    if (view !== "2d" || dragMoved) return;
     const rect = canvas.getBoundingClientRect();
     const p = plot();
     if (p.size <= 0) return;
@@ -531,6 +613,23 @@
     start = normToUV(nx, ny);
     rebuild();
   });
+
+  // вращение поверхности в 3D
+  let dragMoved = false;
+  canvas.addEventListener("mousedown", (e) => {
+    if (view !== "3d") return;
+    dragRot = { x: e.clientX, y: e.clientY }; dragMoved = false;
+  });
+  window.addEventListener("mousemove", (e) => {
+    if (!dragRot) return;
+    const dx = e.clientX - dragRot.x, dy = e.clientY - dragRot.y;
+    if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+    dragRot.x = e.clientX; dragRot.y = e.clientY;
+    cam.yaw += dx * 0.01;
+    cam.elev = Math.max(0.18, Math.min(1.45, cam.elev + dy * 0.008));
+    render();
+  });
+  window.addEventListener("mouseup", () => { dragRot = null; });
 
   window.addEventListener("keydown", (e) => {
     if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
@@ -546,9 +645,11 @@
   start = { u: fn.start.u, v: fn.start.v };
   betaCtrl.style.display = methodSel.value === "momentum" ? "" : "none";
   lrRange.value = lrToSlider(fn.lr0);
+  updateBatchUI();
   syncFuncUI();
   syncLabels();
-  resize();      // строит поле и рендерит
+  setView("2d");
+  resize();      // строит поле, 3D-сетку и рендерит
   rebuild();
   requestAnimationFrame(loop);
 })();
