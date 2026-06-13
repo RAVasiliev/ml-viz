@@ -234,9 +234,55 @@
   canvas.addEventListener("mouseleave", () => setHover(-1));
   canvas.addEventListener("click", (e) => { const r = canvas.getBoundingClientRect(); setPin(nearest(e.clientX - r.left)); });
 
+  // ---------- кривульки: штраф MAE/MSE/RMSE от размера промаха ----------
+  const cCanvas = $("#curves"), cctx = cCanvas ? cCanvas.getContext("2d") : null;
+  let CW = 0, CH = 0;
+  function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  function resizeCurves() {
+    if (!cCanvas) return;
+    const r = cCanvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    CW = r.width; CH = r.height; cCanvas.width = Math.round(CW * dpr); cCanvas.height = Math.round(CH * dpr);
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawCurves();
+  }
+  function drawCurves() {
+    if (!cctx || !CW) return;
+    cctx.clearRect(0, 0, CW, CH);
+    const pad = { l: 44, r: 14, t: 14, b: 34 };
+    const x0 = pad.l, y0 = pad.t, pw = CW - pad.l - pad.r, ph = CH - pad.t - pad.b;
+    const xmax = Math.max(4, ...DATA.map((d) => d.ae)), ymax = xmax * xmax;
+    const PX = (x) => x0 + x / xmax * pw, PY = (y) => y0 + ph - y / ymax * ph;
+    cctx.font = "11px -apple-system, system-ui, sans-serif"; cctx.strokeStyle = "rgba(20,23,28,.06)";
+    cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
+    for (let k = 0; k <= 4; k++) { const yy = ymax * k / 4, Y = PY(yy); cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(Math.round(yy) + "", x0 - 7, Y); }
+    cctx.textAlign = "center"; cctx.textBaseline = "alphabetic";
+    for (let k = 0; k <= xmax; k++) cctx.fillText(k + "", PX(k), y0 + ph + 16);
+    cctx.fillText("размер промаха |e|, кг", x0 + pw / 2, y0 + ph + 30);
+    cctx.save(); cctx.translate(13, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("штраф", 0, 0); cctx.restore();
+    const line = (fn, color, dash) => { cctx.strokeStyle = color; cctx.lineWidth = 2.6; cctx.setLineDash(dash || []); cctx.beginPath(); for (let s = 0; s <= 120; s++) { const x = xmax * s / 120, X = PX(x), Y = PY(Math.min(ymax, fn(x))); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); cctx.setLineDash([]); };
+    line((x) => x * x, "#4f46e5");        // MSE — парабола
+    line((x) => x, "#10b981");            // MAE — прямая
+    line((x) => x, "#8b5cf6", [6, 5]);    // RMSE (на одной точке = MAE)
+    cctx.textAlign = "left"; cctx.textBaseline = "middle"; cctx.font = "12px -apple-system, sans-serif";
+    let lx = x0 + 8; const ly = y0 + 10;
+    const leg = (c, t, dash) => { cctx.strokeStyle = c; cctx.lineWidth = 2.6; cctx.setLineDash(dash || []); cctx.beginPath(); cctx.moveTo(lx, ly); cctx.lineTo(lx + 20, ly); cctx.stroke(); cctx.setLineDash([]); cctx.fillStyle = "#14171c"; cctx.fillText(t, lx + 25, ly); lx += 25 + cctx.measureText(t).width + 16; };
+    leg("#10b981", "MAE = |e|"); leg("#4f46e5", "MSE = e²"); leg("#8b5cf6", "RMSE", [6, 5]);
+    const i = effIndex();
+    if (i >= 0 && DATA[i] && DATA[i].ae > 0) {
+      const e = DATA[i].ae, X = PX(e);
+      cctx.strokeStyle = "rgba(20,23,28,.3)"; cctx.setLineDash([4, 4]); cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
+      cctx.beginPath(); cctx.arc(X, PY(Math.min(ymax, e * e)), 5, 0, 7); cctx.fillStyle = "#4f46e5"; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke();
+      cctx.beginPath(); cctx.arc(X, PY(e), 5, 0, 7); cctx.fillStyle = "#10b981"; cctx.fill(); cctx.stroke();
+      const txt = "промах " + e + " → MAE " + e + ", MSE " + (e * e);
+      cctx.font = "700 11px -apple-system, sans-serif"; const tw = cctx.measureText(txt).width + 16;
+      let tx = X + 10; if (tx + tw > CW - 4) tx = X - tw - 10;
+      cctx.fillStyle = "rgba(20,23,28,.9)"; roundRect(cctx, tx, y0 + 6, tw, 22, 7); cctx.fill();
+      cctx.fillStyle = "#fff"; cctx.textAlign = "left"; cctx.textBaseline = "middle"; cctx.fillText(txt, tx + 8, y0 + 17);
+    }
+  }
+
   // ---------- управление ----------
-  function renderAll() { renderShelf(); renderTable(); renderMetrics(); renderVerdict(); drawChart(); }
-  function rebuild() { generate(); state.hover = -1; renderAll(); }
+  function renderAll() { renderShelf(); renderTable(); renderMetrics(); renderVerdict(); drawChart(); drawCurves(); }
+  function rebuild() { generate(); state.hover = -1; state.pinned = -1; state.shown = -1; renderAll(); }
 
   $("#viewSeg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     $("#viewSeg").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
@@ -253,8 +299,8 @@
     state.seed = (state.seed * 1103515245 + 12345) >>> 0;
     state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", () => { resize(); resizeCurves(); });
 
   // ---------- старт ----------
-  generate(); renderShelf(); renderTable(); renderMetrics(); renderVerdict(); resize();
+  generate(); renderShelf(); renderTable(); renderMetrics(); renderVerdict(); resize(); resizeCurves();
 })();
