@@ -75,6 +75,20 @@
     .curve-host { position:relative; width:100%; height:300px; border-radius:12px; border:1px solid var(--line);
       background:var(--surface-2); overflow:hidden; }
     .curve-host canvas { position:absolute; inset:0; width:100%; height:100%; cursor:default; }
+
+    /* математическая типографика */
+    .math { font-family:"STIX Two Math","Cambria Math","Latin Modern Math","Times New Roman",Georgia,serif; font-size:1.05em; white-space:nowrap; }
+    .math i, .math em { font-style:italic; }
+    .frac { display:inline-flex; flex-direction:column; vertical-align:middle; text-align:center; line-height:1.18; margin:0 3px; }
+    .frac .den { border-top:1.6px solid currentColor; padding-top:1px; }
+    .sqrtm { display:inline-flex; align-items:stretch; }
+    .sqrtm .sgn { font-size:1.35em; line-height:1.15; }
+    .sqrtm .rad { border-top:1.7px solid currentColor; padding:5px 9px 0; margin-left:-3px; }
+    .sumop { position:relative; display:inline-block; font-size:1.5em; line-height:1; padding:0 .5em 0 .12em; vertical-align:middle; }
+    .sumop sup { position:absolute; top:-.52em; left:52%; transform:translateX(-50%); font-size:.4em; font-style:normal; }
+    .sumop sub { position:absolute; bottom:-.46em; left:52%; transform:translateX(-50%); font-size:.4em; font-style:normal; }
+    .mline { display:flex; align-items:center; flex-wrap:wrap; gap:2px 4px; font-size:16px; line-height:2.1; }
+    .mlabel { font-weight:700; font-size:17px; }
   </style>
 </head>
 <body>
@@ -92,7 +106,7 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Регрессия · Метрики ошибки</div>
       <h1>Насколько мы промахнулись?</h1>
-      <p class="lead">На празднике урожая мы на глаз угадываем вес арбузов — это <b style="color:#0ea5e9">предсказание ŷ</b>. Потом кладём каждый на весы — это <b style="color:#334155">факт y</b>. У каждого арбуза свой <b>промах</b>. Вопрос: <b>насколько мы ошибаемся в среднем?</b> На него отвечают три числа — <b>MAE</b>, <b>MSE</b> и <b>RMSE</b>.</p>
+      <p class="lead">Для каждого арбуза модель даёт <b style="color:#0ea5e9">прогноз веса <span class="math"><i>ŷ</i></span></b>, а весы показывают <b style="color:#334155">факт <span class="math"><i>y</i></span></b>. Их разность — ошибка <span class="math"><i>e<sub>i</sub></i> = <i>y<sub>i</sub></i> − <i>ŷ<sub>i</sub></i></span>. Вопрос: <b>насколько модель ошибается в среднем?</b> На него отвечают три метрики — <b>MAE</b>, <b>MSE</b>, <b>RMSE</b>.</p>
     </div>
 
     <div class="controls-bar">
@@ -101,10 +115,7 @@
       <span class="hint-inline">наведи на любой арбуз — он подсветится в таблице, на графике и в формуле</span>
     </div>
 
-    <div class="section-title" style="margin-top:20px">Грядка: что угадали (ŷ) и что показали весы (y)</div>
-    <div class="shelf" id="shelf"></div>
-
-    <div class="grid2" style="margin-top:18px">
+    <div class="grid2" style="margin-top:20px">
       <div>
         <div class="toggle-row">
           <span class="seg" id="viewSeg">
@@ -118,7 +129,7 @@
       <div>
         <div class="section-title" style="margin-top:0">Таблица: как промах превращается в число</div>
         <table class="calc"><thead>
-          <tr><th class="obj">арбуз</th><th>угадал ŷ</th><th>весы y</th><th>ошибка e=y−ŷ</th><th class="mae">|e|</th><th class="mse">e²</th></tr>
+          <tr><th class="obj">арбуз</th><th>прогноз <span class="math"><i>ŷ<sub>i</sub></i></span></th><th>факт <span class="math"><i>y<sub>i</sub></i></span></th><th>ошибка <span class="math"><i>e<sub>i</sub></i></span></th><th class="mae"><span class="math">|<i>e<sub>i</sub></i>|</span></th><th class="mse"><span class="math"><i>e<sub>i</sub></i>²</span></th></tr>
         </thead><tbody id="tbody"></tbody></table>
       </div>
     </div>

@@ -17,6 +17,7 @@
         ML-виз
       </a>
       <nav>
+        <a href="#quality">Метрики</a>
         <a href="#clustering">Кластеризация</a>
         <a href="#trees">Деревья</a>
         <a href="#metric">Метрические</a>
@@ -31,6 +32,31 @@
     <section class="hero">
       <h1>Машинное обучение, которое <span class="grad">видно глазами</span></h1>
       <p>Интерактивные визуализации алгоритмов ML: крути параметры, запускай по шагам и смотри, как алгоритм принимает решения. Вдохновлено визуализациями Нафтали Харриса.</p>
+    </section>
+
+    <!-- Метрики качества модели -->
+    <section class="section" id="quality">
+      <div class="section-head"><h2>Метрики качества модели</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/regmetrics/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <line x1="55" y1="50" x2="55" y2="74" stroke="#0ea5e9" stroke-width="3"/><circle cx="55" cy="50" r="5" fill="#334155"/><circle cx="55" cy="74" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
+            <line x1="110" y1="40" x2="110" y2="64" stroke="#f59e0b" stroke-width="3"/><circle cx="110" cy="64" r="5" fill="#334155"/><circle cx="110" cy="40" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
+            <rect x="150" y="30" width="56" height="56" fill="#4f46e5" opacity=".18" stroke="#4f46e5"/><line x1="150" y1="30" x2="150" y2="86" stroke="#0ea5e9" stroke-width="3"/><circle cx="150" cy="30" r="5" fill="#334155"/><circle cx="150" cy="86" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
+            <line x1="240" y1="70" x2="240" y2="82" stroke="#10b981" stroke-width="3"/><circle cx="240" cy="76" r="5" fill="#334155"/>
+          </svg></div>
+          <div class="card-body"><h3>Метрики регрессии: MAE / MSE / RMSE <span class="badge ready">Готово</span></h3><p>На арбузах: как промах превращается в ошибку и в метрику. Остатки, квадраты e², связка таблица↔график. Для занятия.</p></div>
+        </a>
+        <a class="card ready" href="viz/roc/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <rect x="0" y="0" width="150" height="132" fill="#10b981" opacity=".10"/><rect x="150" y="0" width="130" height="132" fill="#ef4444" opacity=".10"/>
+            <circle cx="55" cy="60" r="5" fill="#10b981"/><circle cx="90" cy="92" r="5" fill="#10b981"/><circle cx="120" cy="50" r="5" fill="#10b981"/>
+            <circle cx="175" cy="80" r="5" fill="#ef4444"/><circle cx="210" cy="46" r="5" fill="#ef4444"/><circle cx="235" cy="96" r="5" fill="#ef4444"/>
+            <circle cx="132" cy="86" r="5" fill="#ef4444" stroke="#14171c" stroke-width="2"/>
+            <line x1="150" y1="14" x2="150" y2="120" stroke="#4f46e5" stroke-width="2.5" stroke-dasharray="6 5"/></svg></div>
+          <div class="card-body"><h3>Метрики классификации: болен или здоров? <span class="badge ready">Готово</span></h3><p>Тащишь порог — видишь TP/FP/FN/TN, матрицу ошибок и компромисс Precision / Recall.</p></div>
+        </a>
+      </div>
     </section>
 
     <!-- Кластеризация -->
@@ -156,7 +182,7 @@
 
     <!-- Регрессия -->
     <section class="section" id="regression">
-      <div class="section-head"><h2>Регрессия и метрики</h2><span class="rule"></span></div>
+      <div class="section-head"><h2>Регрессия</h2><span class="rule"></span></div>
       <div class="grid">
         <a class="card ready" href="viz/linreg/index.html">
           <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
@@ -164,30 +190,6 @@
             <line x1="70" y1="95" x2="70" y2="78" stroke="#ef4444" stroke-opacity=".5"/><line x1="140" y1="72" x2="140" y2="88" stroke="#ef4444" stroke-opacity=".5"/><line x1="200" y1="50" x2="200" y2="38" stroke="#ef4444" stroke-opacity=".5"/>
             <circle cx="70" cy="78" r="4" fill="#14171c"/><circle cx="140" cy="88" r="4" fill="#14171c"/><circle cx="200" cy="38" r="4" fill="#14171c"/></svg></div>
           <div class="card-body"><h3>Линейная регрессия <span class="badge ready">Готово</span></h3><p>МНК, остатки, MSE/MAE/RMSE/R², устойчивость к выбросам.</p></div>
-        </a>
-        <a class="card ready" href="viz/regmetrics/index.html">
-          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
-            <line x1="55" y1="50" x2="55" y2="74" stroke="#0ea5e9" stroke-width="3"/><circle cx="55" cy="50" r="5" fill="#334155"/><circle cx="55" cy="74" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
-            <line x1="110" y1="40" x2="110" y2="64" stroke="#f59e0b" stroke-width="3"/><circle cx="110" cy="64" r="5" fill="#334155"/><circle cx="110" cy="40" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
-            <rect x="150" y="30" width="56" height="56" fill="#4f46e5" opacity=".18" stroke="#4f46e5"/><line x1="150" y1="30" x2="150" y2="86" stroke="#0ea5e9" stroke-width="3"/><circle cx="150" cy="30" r="5" fill="#334155"/><circle cx="150" cy="86" r="5" fill="#fff" stroke="#0ea5e9" stroke-width="2.5"/>
-            <line x1="240" y1="70" x2="240" y2="82" stroke="#10b981" stroke-width="3"/><circle cx="240" cy="76" r="5" fill="#334155"/>
-          </svg></div>
-          <div class="card-body"><h3>Метрики ошибки: MAE / MSE / RMSE <span class="badge ready">Готово</span></h3><p>На арбузах: как промах превращается в ошибку и в метрику. Остатки, квадраты e², связка таблица↔график. Для занятия.</p></div>
-        </a>
-      </div>
-    </section>
-
-    <!-- Метрики классификации -->
-    <section class="section" id="metrics">
-      <div class="section-head"><h2>Качество классификации</h2><span class="rule"></span></div>
-      <div class="grid">
-        <a class="card ready" href="viz/roc/index.html">
-          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
-            <path d="M40 120 L40 20 L240 20" stroke="#e7eaf0" stroke-width="1.5" fill="none"/>
-            <path d="M40 120 C60 60 120 30 240 20" stroke="#4f46e5" stroke-width="2.5" fill="none"/>
-            <path d="M40 120 L240 20" stroke="#cbd5e1" stroke-dasharray="4 4"/>
-            <circle cx="95" cy="62" r="4" fill="#4f46e5"/></svg></div>
-          <div class="card-body"><h3>Болен или здоров? <span class="badge ready">Готово</span></h3><p>Тащишь порог — видишь TP/FP/FN/TN, матрицу ошибок и компромисс Precision / Recall.</p></div>
         </a>
       </div>
     </section>

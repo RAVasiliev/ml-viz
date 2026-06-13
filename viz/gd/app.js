@@ -20,6 +20,18 @@
   const methTag = $("methTag"), formulaEl = $("formula");
   const batchCtrl = $("batchCtrl"), batchSel = $("batch"), bsCtrl = $("bsCtrl"), bsRange = $("batchSize"), bsVal = $("batchSizeVal");
   const hintEl = $("hint"), legendNote = $("legendNote");
+  const terrainCtrl = $("terrainCtrl"), bumpsRange = $("bumps"), bumpsVal = $("bumpsVal"), newTerrainBtn = $("newTerrain");
+
+  let terrainSeed = 1, terrainK = 9;
+  let terrainFn = null;                 // текущий сгенерированный рельеф
+  // вернуть актуальный объект функции (для рельефа — сгенерированный экземпляр)
+  function resolveFn() {
+    if (funcSel.value === "terrain") {
+      if (!terrainFn) terrainFn = GD.makeTerrain(terrainSeed, terrainK);
+      return terrainFn;
+    }
+    return GD.funcs[funcSel.value];
+  }
 
   let fn = null;            // текущая функция потерь (объект из GD.funcs)
   let gd = null;            // текущий степпер
@@ -196,7 +208,7 @@
 
   /* ------------------------------ степпер ------------------------------ */
   function rebuild() {
-    fn = GD.funcs[funcSel.value];
+    fn = resolveFn();
     if (!start) start = { u: fn.start.u, v: fn.start.v };
     gd = new GD.Stepper(fn, {
       lr: sliderToLR(),
@@ -542,10 +554,21 @@
   function updateBatchUI() {
     batchCtrl.style.display = "";                 // батч-режим доступен на любой функции
     bsCtrl.style.display = batchSel.value === "mini" ? "" : "none";
+    terrainCtrl.style.display = funcSel.value === "terrain" ? "" : "none";
     const maxB = fn.isData ? fn.n : 32;
     bsRange.max = maxB;
     if (+bsRange.value > maxB) bsRange.value = Math.min(8, maxB);
     bsVal.textContent = bsRange.value;
+  }
+  // перегенерировать случайный рельеф и полностью обновить сцену
+  function regenTerrain() {
+    terrainFn = GD.makeTerrain(terrainSeed, terrainK);
+    fn = terrainFn;
+    start = { u: fn.start.u, v: fn.start.v };
+    lrRange.value = lrToSlider(fn.lr0);
+    syncFuncUI(); syncLabels();
+    buildField(); build3D(); setView(view);
+    rebuild();
   }
   function setView(v) {
     view = v;
@@ -566,7 +589,7 @@
 
   // смена функции: новая стартовая точка по умолчанию + пересчёт диапазона lr
   function onFuncChange() {
-    fn = GD.funcs[funcSel.value];
+    fn = resolveFn();
     start = { u: fn.start.u, v: fn.start.v };
     lrRange.value = lrToSlider(fn.lr0); // ставим рекомендованный lr
     updateBatchUI();
@@ -600,6 +623,8 @@
   document.querySelectorAll(".vtab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
   batchSel.addEventListener("change", () => { updateBatchUI(); rebuild(); });
   bsRange.addEventListener("input", () => { bsVal.textContent = bsRange.value; rebuild(); });
+  newTerrainBtn.addEventListener("click", () => { terrainSeed = (terrainSeed * 1664525 + 1013904223) >>> 0; regenTerrain(); });
+  bumpsRange.addEventListener("input", () => { terrainK = +bumpsRange.value; bumpsVal.textContent = terrainK; regenTerrain(); });
 
   // клик по полю (только 2D) — задать стартовую точку
   canvas.addEventListener("click", (e) => {

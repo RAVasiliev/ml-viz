@@ -192,7 +192,53 @@
     };
   })();
 
-  const FUNCS = { bowl, ravine, wavy, rosen, saddle, twowells, himmelblau, rastrigin, styblinski, ackley, linreg };
+  // 12) Случайный рельеф — сумма гауссовых ям и холмов (процедурный ландшафт).
+  //     L = ½·b·(x²+y²) + Σ aₖ·exp(−‖p−cₖ‖²/2sₖ²);  градиент аналитический.
+  //     Каждый seed → новая карта. Глобальный минимум ищем по сетке + уточняем GD.
+  function makeTerrain(seed, bumps) {
+    const r = rng((seed >>> 0) || 1);
+    const dom = { umin: -3, umax: 3, vmin: -3, vmax: 3 };
+    const K = Math.max(3, bumps || 8);
+    const comps = [];
+    for (let k = 0; k < K; k++) {
+      const cx = -2.4 + 4.8 * r(), cy = -2.4 + 4.8 * r();
+      const s = 0.42 + 0.95 * r();
+      const sign = r() < 0.62 ? -1 : 1;            // чаще ямы, чем холмы
+      const a = sign * (0.6 + 1.9 * r());
+      comps.push({ cx, cy, s2: s * s, a });
+    }
+    const b = 0.08;                                 // мягкая глобальная чаша (ограничивает рельеф)
+    const L = (u, v) => {
+      let s = 0.5 * b * (u * u + v * v);
+      for (const c of comps) { const dx = u - c.cx, dy = v - c.cy; s += c.a * Math.exp(-(dx * dx + dy * dy) / (2 * c.s2)); }
+      return s;
+    };
+    const grad = (u, v) => {
+      let gu = b * u, gv = b * v;
+      for (const c of comps) { const dx = u - c.cx, dy = v - c.cy; const e = c.a * Math.exp(-(dx * dx + dy * dy) / (2 * c.s2)); gu += e * (-dx / c.s2); gv += e * (-dy / c.s2); }
+      return [gu, gv];
+    };
+    // глобальный минимум: грубый поиск по сетке + уточнение градиентным спуском
+    let best = { u: 0, v: 0, L: Infinity }, M = 90;
+    for (let j = 0; j <= M; j++) { const v = dom.vmin + (j / M) * (dom.vmax - dom.vmin); for (let i = 0; i <= M; i++) { const u = dom.umin + (i / M) * (dom.umax - dom.umin); const val = L(u, v); if (val < best.L) best = { u, v, L: val }; } }
+    let mu = best.u, mv = best.v;
+    for (let t = 0; t < 80; t++) { const g = grad(mu, mv); mu -= 0.02 * g[0]; mv -= 0.02 * g[1]; }
+    // старт — из самого «высокого» из углов/краёв, чтобы спуск был зрелищным
+    let st = { u: -2.4, v: 2.4, L: -Infinity };
+    for (const c of [[-2.4, 2.4], [2.4, 2.4], [-2.4, -2.4], [2.4, -2.4], [0, 2.6], [2.6, 0], [-2.6, 0], [0, -2.6]]) {
+      const val = L(c[0], c[1]); if (val > st.L) st = { u: c[0], v: c[1], L: val };
+    }
+    return {
+      id: "terrain", name: "Случайный рельеф", isTerrain: true, seed: seed, bumps: K,
+      L, grad, domain: dom,
+      minima: [{ u: mu, v: mv }],
+      start: { u: st.u, v: st.v }, lr0: 0.06,
+      formula: "L = ½·0.08(x²+y²) + Σ aₖ·e^(−‖p−cₖ‖²/2sₖ²)",
+      note: "Сгенерированный рельеф из случайных ям и холмов. Жми «Новый рельеф» — каждый раз новая карта: ищи, куда сойдётся спуск и поможет ли шум выбраться к глобальному минимуму.",
+    };
+  }
+
+  const FUNCS = { bowl, ravine, wavy, rosen, saddle, twowells, himmelblau, rastrigin, styblinski, ackley, terrain: makeTerrain(1, 9), linreg };
   const FUNC_LIST = Object.keys(FUNCS).map((k) => ({ id: k, name: FUNCS[k].name }));
 
   /* --------------------- Степпер ---------------------
@@ -287,5 +333,5 @@
     return { u, v };
   }
 
-  window.GD = { funcs: FUNCS, list: FUNC_LIST, Stepper: GDStepper, rng, gauss, startFromSeed };
+  window.GD = { funcs: FUNCS, list: FUNC_LIST, Stepper: GDStepper, rng, gauss, startFromSeed, makeTerrain };
 })();
