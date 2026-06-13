@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Random Forest — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css" />
+  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../../index.html">
+        <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg></span>
+        ML-виз
+      </a>
+      <nav><a href="../../index.html">← Все визуализации</a></nav>
+    </div>
+  </header>
+
+  <main class="lab">
+    <div class="lab-head">
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Деревья · Random Forest</div>
+      <h1>Random Forest — случайный лес</h1>
+      <p>Каждое дерево учится на своей <b>bootstrap-выборке</b> и при каждом сплите выбирает из случайного подмножества признаков (<b>max_features</b>). Ответ ансамбля — голосование деревьев. Одиночное дерево даёт «зубчатую» границу (справа снизу), а усреднение десятков таких — <b>гладкую и устойчивую</b> (слева). Это снижение дисперсии: Var ≈ ρσ² + (1−ρ)σ²/M.</p>
+    </div>
+
+    <div class="lab-grid">
+      <aside class="panel">
+        <div class="control">
+          <label for="dataset">Датасет</label>
+          <select id="dataset"></select>
+        </div>
+        <div class="control">
+          <label for="points">Точек <span class="val" id="pointsVal">240</span></label>
+          <input type="range" id="points" min="40" max="500" step="10" value="240" />
+        </div>
+        <div class="control">
+          <label for="trees">Деревьев <span class="val" id="treesVal">40</span></label>
+          <input type="range" id="trees" min="1" max="120" step="1" value="40" />
+          <div class="hint">n_estimators. Больше деревьев → стабильнее, но прирост выходит на плато.</div>
+        </div>
+        <div class="control">
+          <label for="depth">Глубина дерева <span class="val" id="depthVal">7</span></label>
+          <input type="range" id="depth" min="1" max="12" step="1" value="7" />
+          <div class="hint">Глубокие деревья — низкое смещение, лес гасит их дисперсию.</div>
+        </div>
+        <div class="control">
+          <label for="feat">max_features (признаков на сплит)</label>
+          <select id="feat">
+            <option value="1">1 — случайный признак (как √p)</option>
+            <option value="2">2 — оба (= bagging)</option>
+          </select>
+          <div class="hint">Меньше признаков → деревья разнообразнее (ниже ρ) → ниже дисперсия леса.</div>
+        </div>
+        <div class="control">
+          <label for="speed">Скорость <span class="val" id="speedVal">35</span></label>
+          <input type="range" id="speed" min="1" max="100" step="1" value="35" />
+        </div>
+        <div class="control">
+          <div class="btn-row">
+            <button class="btn primary" id="play"></button>
+            <button class="btn" id="step" title="+1 дерево (→)">+ Дерево</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="reset" title="Сброс (R)">↺ Сброс</button>
+            <button class="btn" id="regen" title="Новые данные (N)">🎲 Данные</button>
+          </div>
+        </div>
+        <div class="control">
+          <div class="stats">
+            <div class="stat"><div class="num" id="statTrees">0 / 0</div><div class="lbl">деревьев</div></div>
+            <div class="stat"><div class="num" id="statAcc">0%</div><div class="lbl">train-accuracy</div></div>
+          </div>
+          <div class="progress"><span id="progressBar"></span></div>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="canvas-host" style="aspect-ratio:auto;height:430px">
+          <canvas id="canvas"></canvas>
+          <div class="canvas-hint">граница ансамбля · насыщенность = уверенность голосов</div>
+        </div>
+        <div class="dendro-wrap">
+          <div class="dendro-label">Последнее добавленное дерево · одиночная «зубчатая» осевая граница — контраст с гладким лесом</div>
+          <div class="dendro-host" style="height:210px;aspect-ratio:auto"><canvas id="last"></canvas></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:#4f46e5"></i> класс 0</span>
+          <span><i class="dot" style="background:#ef4444"></i> класс 1</span>
+          <span><i class="dot" style="background:#10b981"></i> класс 2</span>
+          <span style="color:var(--faint)">фон — предсказание, точки — истинные метки</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../../assets/js/datasets-labeled.js"></script>
+  <script src="../../assets/js/tree-core.js"></script>
+  <script src="forest.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

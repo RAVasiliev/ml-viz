@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Градиентный бустинг — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css" />
+  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    /* нижняя под-панель: переключатель «что показывать» */
+    .subhead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 2px 7px; }
+    .seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:8px; overflow:hidden; }
+    .seg button {
+      font:inherit; font-size:12px; font-weight:600; color:var(--muted);
+      padding:5px 11px; border:none; background:var(--surface); cursor:pointer;
+    }
+    .seg button + button { border-left:1px solid var(--line); }
+    .seg button.on { background:var(--accent); color:#fff; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../../index.html">
+        <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg></span>
+        ML-виз
+      </a>
+      <nav><a href="../../index.html">← Все визуализации</a></nav>
+    </div>
+  </header>
+
+  <main class="lab">
+    <div class="lab-head">
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Деревья · Градиентный бустинг</div>
+      <h1>Градиентный бустинг (1D-регрессия)</h1>
+      <p>Деревья строятся <b>последовательно</b>: начинаем с константы <code>F₀ = mean(y)</code>, дальше каждое новое дерево фитит <b>остатки</b> <code>rᵢ = yᵢ − F(xᵢ)</code> — для MSE это и есть антиградиент. Ансамбль обновляется маленьким шагом: <code>F(x) ← F(x) + η·tree(x)</code>. Это <b>«стрельба по лунке»</b>: каждое неглубокое дерево чуть-чуть подталкивает кривую к таргету. Следи, как падает <b>train-MSE</b> и как ансамбль из ступенек собирает гладкую зависимость.</p>
+    </div>
+
+    <div class="lab-grid">
+      <aside class="panel">
+        <div class="control">
+          <label for="target">Зависимость y(x)</label>
+          <select id="target"></select>
+        </div>
+        <div class="control">
+          <label for="points">Точек <span class="val" id="pointsVal">120</span></label>
+          <input type="range" id="points" min="30" max="300" step="10" value="120" />
+        </div>
+        <div class="control">
+          <label for="noise">Шум <span class="val" id="noiseVal">0.06</span></label>
+          <input type="range" id="noise" min="0" max="20" step="1" value="6" />
+          <div class="hint">σ гауссова шума, добавленного к истинной y(x).</div>
+        </div>
+        <div class="control">
+          <label for="eta">learning_rate η <span class="val" id="etaVal">0.30</span></label>
+          <input type="range" id="eta" min="2" max="100" step="1" value="30" />
+          <div class="hint">«Шаг в правильном направлении». Меньше η — медленнее, но устойчивее; больше — быстрее, риск перелёта.</div>
+        </div>
+        <div class="control">
+          <label for="depth">Глубина дерева <span class="val" id="depthVal">2</span></label>
+          <input type="range" id="depth" min="1" max="3" step="1" value="2" />
+          <div class="hint">Неглубокие деревья («слабые ученики»): 1 = пень, 2–3 = пара уровней.</div>
+        </div>
+        <div class="control">
+          <label for="nest">n_estimators (цель) <span class="val" id="nestVal">60</span></label>
+          <input type="range" id="nest" min="1" max="200" step="1" value="60" />
+          <div class="hint">Сколько деревьев построить. Запуск идёт до этого числа.</div>
+        </div>
+        <div class="control">
+          <label for="speed">Скорость <span class="val" id="speedVal">30</span></label>
+          <input type="range" id="speed" min="1" max="100" step="1" value="30" />
+        </div>
+        <div class="control">
+          <div class="btn-row">
+            <button class="btn primary" id="play"></button>
+            <button class="btn" id="step" title="Одно дерево (→)">Дерево ⏭</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="reset" title="Сброс (R)">↺ Сброс</button>
+            <button class="btn" id="regen" title="Новые данные (N)">🎲 Данные</button>
+          </div>
+        </div>
+        <div class="control">
+          <div class="stats">
+            <div class="stat"><div class="num" id="statTrees">0</div><div class="lbl">деревьев</div></div>
+            <div class="stat"><div class="num" id="statMSE">—</div><div class="lbl">train-MSE</div></div>
+            <div class="stat"><div class="num" id="statEta" style="color:#4f46e5">0.30</div><div class="lbl">η</div></div>
+            <div class="stat"><div class="num" id="statDepth">2</div><div class="lbl">глубина</div></div>
+          </div>
+          <div class="progress"><span id="progressBar"></span></div>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="canvas-host" style="aspect-ratio:auto;height:430px">
+          <canvas id="canvas"></canvas>
+          <div class="canvas-hint">серый пунктир — истинная y(x), фиолетовая ступенчатая — ансамбль F(x)</div>
+        </div>
+        <div class="dendro-wrap">
+          <div class="subhead">
+            <div class="dendro-label" id="subLabel">Предсказание последнего дерева по остаткам</div>
+            <div class="seg">
+              <button id="modeTree" class="on">дерево</button>
+              <button id="modeMse">train-MSE</button>
+            </div>
+          </div>
+          <div class="dendro-host" style="height:190px"><canvas id="sub"></canvas></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:#4f46e5"></i> ансамбль F(x)</span>
+          <span><i class="dot" style="background:#94a3b8"></i> истинная y(x)</span>
+          <span><i class="dot" style="background:#ef4444"></i> остатки rᵢ</span>
+          <span style="color:var(--faint)">точки — обучающая выборка (x, y)</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="boosting.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

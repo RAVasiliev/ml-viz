@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Иерархическая кластеризация — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css" />
+  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../../index.html">
+        <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg></span>
+        ML-виз
+      </a>
+      <nav><a href="../../index.html">← Все визуализации</a></nav>
+    </div>
+  </header>
+
+  <main class="lab">
+    <div class="lab-head">
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Кластеризация · Иерархическая</div>
+      <h1>Иерархическая (агломеративная) кластеризация</h1>
+      <p>Снизу вверх: сначала каждая точка — отдельный кластер, затем на каждом шаге сливаются два ближайших — и так до единого корня. Способ измерять «близость» кластеров задаёт <b>linkage</b> и сильно меняет форму результата. Дендрограмма строится целиком, а ползунок <b>«Срез на K»</b> проводит горизонтальный порог: ниже него — K цветных кластеров, выше — серые ветви.</p>
+    </div>
+
+    <div class="lab-grid">
+      <aside class="panel">
+        <div class="control">
+          <label for="dataset">Датасет</label>
+          <select id="dataset"></select>
+        </div>
+
+        <div class="control">
+          <label for="points">Точек <span class="val" id="pointsVal">120</span></label>
+          <input type="range" id="points" min="30" max="240" step="10" value="120" />
+          <div class="hint">Метод тяжелее DBSCAN — держим до ~240 точек.</div>
+        </div>
+
+        <div class="control">
+          <label for="linkage">Linkage</label>
+          <select id="linkage">
+            <option value="ward">ward (метод Уорда)</option>
+            <option value="average">average (UPGMA)</option>
+            <option value="single">single (минимум)</option>
+            <option value="complete">complete (максимум)</option>
+          </select>
+          <div class="hint">ward (по умолчанию в курсе) минимизирует прирост внутрикластерной дисперсии; single тянет «цепочки», complete — компактные сгустки.</div>
+        </div>
+
+        <div class="control">
+          <label for="target">Срез на K <span class="val" id="targetVal">3</span></label>
+          <input type="range" id="target" min="1" max="10" step="1" value="3" />
+          <div class="hint">Горизонтальный срез дерева на K кластеров. Не останавливает слияния — только перекрашивает.</div>
+        </div>
+
+        <div class="control">
+          <label for="speed">Скорость <span class="val" id="speedVal">35</span></label>
+          <input type="range" id="speed" min="1" max="100" step="1" value="35" />
+        </div>
+
+        <div class="control">
+          <div class="btn-row">
+            <button class="btn primary" id="play"></button>
+            <button class="btn" id="step" title="Одно слияние (→)">Шаг ⏭</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="reset" title="Сброс (R)">↺ Сброс</button>
+            <button class="btn" id="regen" title="Новые данные (N)">🎲 Данные</button>
+          </div>
+        </div>
+
+        <div class="control">
+          <div class="stats">
+            <div class="stat"><div class="num" id="statActive">0</div><div class="lbl">кластеров (срез)</div></div>
+            <div class="stat"><div class="num" id="statMerges">0</div><div class="lbl">слияний</div></div>
+            <div class="stat"><div class="num" id="statLevel">0</div><div class="lbl">порог слияния</div></div>
+            <div class="stat"><div class="num" id="statTotal">0</div><div class="lbl">точек всего</div></div>
+          </div>
+          <div class="progress"><span id="progressBar"></span></div>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="canvas-host" style="aspect-ratio:auto;height:430px">
+          <canvas id="canvas"></canvas>
+          <div class="canvas-hint">Клик по полю — добавить точку</div>
+        </div>
+
+        <div class="dendro-wrap">
+          <div class="dendro-label">Дендрограмма · высота ветви = порог слияния · K поддеревьев = срез</div>
+          <div class="dendro-host"><canvas id="dendro"></canvas></div>
+        </div>
+
+        <div class="legend">
+          <span><i class="dot" style="background:#4f46e5"></i> кластеры по цвету</span>
+          <span><i class="dot unvisited"></i> ещё одиночка</span>
+          <span style="color:var(--faint)">поле — порядок слияний, снизу — дендрограмма</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../../assets/js/datasets.js"></script>
+  <script src="hierarchical.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

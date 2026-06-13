@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Логистическая регрессия — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css" />
+  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    /* две под-панели рядом: сигмоида + кривая лог-лосса */
+    .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+    @media (max-width: 560px) { .sub-grid { grid-template-columns: 1fr; } }
+    .sub-host { height: 168px; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../../index.html">
+        <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg></span>
+        ML-виз
+      </a>
+      <nav><a href="../../index.html">← Все визуализации</a></nav>
+    </div>
+  </header>
+
+  <main class="lab">
+    <div class="lab-head">
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Линейные · Логистическая регрессия</div>
+      <h1>Логистическая регрессия</h1>
+      <p>Модель предсказывает <b>вероятность</b> класса 1 через сигмоиду от линейной комбинации признаков: <b>p(x)=σ(w·φ(x)+b)</b>. Веса подбираются <b>градиентным спуском</b> по <b>лог-лоссу</b> (кросс-энтропия = −лог-правдоподобие). Заливка фона — вероятность p от класса 0 к классу 1, белый контур — граница <b>p=0.5</b>. Степень φ=2 добавляет признаки x², xy, y² — граница искривляется и берёт «Кольца»/XOR.</p>
+    </div>
+
+    <div class="lab-grid">
+      <aside class="panel">
+        <div class="control">
+          <label for="dataset">Датасет</label>
+          <select id="dataset"></select>
+        </div>
+        <div class="control">
+          <label for="phi">Степень признаков φ</label>
+          <select id="phi">
+            <option value="1">1 — линейная граница</option>
+            <option value="2">2 — x², xy, y² (изогнутая)</option>
+          </select>
+          <div class="hint">φ(x): степень 1 — прямая, степень 2 — полиномиальные признаки, граница может быть кривой.</div>
+        </div>
+        <div class="control">
+          <label for="lr">Learning rate η <span class="val" id="lrVal">0.50</span></label>
+          <input type="range" id="lr" min="0.02" max="3" step="0.02" value="0.5" />
+          <div class="hint">Шаг градиентного спуска. Больше — быстрее, но риск «прыжков».</div>
+        </div>
+        <div class="control">
+          <label for="lambda">L2 λ <span class="val" id="lambdaVal">0.00</span></label>
+          <input type="range" id="lambda" min="0" max="0.5" step="0.005" value="0" />
+          <div class="hint">Штраф за большие веса ‖w‖² — сглаживает границу, уменьшает переобучение.</div>
+        </div>
+        <div class="control">
+          <label for="speed">Скорость <span class="val" id="speedVal">35</span></label>
+          <input type="range" id="speed" min="1" max="100" step="1" value="35" />
+        </div>
+        <div class="control">
+          <div class="btn-row">
+            <button class="btn primary" id="play"></button>
+            <button class="btn" id="step" title="Одна итерация (→)">Шаг ⏭</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="reset" title="Сброс (R)">↺ Сброс</button>
+            <button class="btn" id="regen" title="Новые данные (N)">🎲 Данные</button>
+          </div>
+        </div>
+        <div class="control">
+          <div class="stats">
+            <div class="stat"><div class="num" id="statIter">0</div><div class="lbl">итерация</div></div>
+            <div class="stat"><div class="num" id="statLoss">—</div><div class="lbl">log-loss</div></div>
+            <div class="stat"><div class="num" id="statAcc">0%</div><div class="lbl">accuracy</div></div>
+            <div class="stat"><div class="num" id="statNorm">0.0</div><div class="lbl">‖w‖</div></div>
+          </div>
+          <div class="progress"><span id="progressBar"></span></div>
+        </div>
+      </aside>
+
+      <section class="stage">
+        <div class="canvas-host">
+          <canvas id="canvas"></canvas>
+          <div class="canvas-hint">обведённые точки — ошибки при пороге p=0.5</div>
+        </div>
+
+        <div class="sub-grid">
+          <div class="dendro-wrap" style="margin-top:0">
+            <div class="dendro-label">Сигмоида σ(z) · отметка — типичный отступ обучения</div>
+            <div class="dendro-host sub-host"><canvas id="sigCv"></canvas></div>
+          </div>
+          <div class="dendro-wrap" style="margin-top:0">
+            <div class="dendro-label">Лог-лосс по итерациям · падает по мере обучения</div>
+            <div class="dendro-host sub-host"><canvas id="lossCv"></canvas></div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <span><i class="dot" style="background:#4f46e5"></i> класс 0</span>
+          <span><i class="dot" style="background:#ef4444"></i> класс 1</span>
+          <span><i class="dot" style="width:14px;height:6px;border-radius:3px;background:#fff;border:1.5px solid #5b6472"></i> граница p=0.5</span>
+          <span style="color:var(--faint)">заливка фона — вероятность p(x) от 0 (синий) к 1 (красный)</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="../../assets/js/datasets-labeled.js"></script>
+  <script src="logreg.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

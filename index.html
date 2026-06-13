@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ML-виз — интерактивные визуализации машинного обучения</title>
+  <link rel="stylesheet" href="assets/css/main.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html">
+        <span class="logo">
+          <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg>
+        </span>
+        ML-виз
+      </a>
+      <nav>
+        <a href="#clustering">Кластеризация</a>
+        <a href="#trees">Деревья</a>
+        <a href="#metric">Метрические</a>
+        <a href="#linear">Линейные</a>
+        <a href="#regression">Регрессия</a>
+        <a href="#optim">Оптимизация</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Машинное обучение, которое <span class="grad">видно глазами</span></h1>
+      <p>Интерактивные визуализации алгоритмов ML: крути параметры, запускай по шагам и смотри, как алгоритм принимает решения. Вдохновлено визуализациями Нафтали Харриса.</p>
+    </section>
+
+    <!-- Кластеризация -->
+    <section class="section" id="clustering">
+      <div class="section-head"><h2>Кластеризация</h2><span class="rule"></span></div>
+      <div class="grid">
+
+        <a class="card ready" href="viz/dbscan/index.html">
+          <div class="thumb">
+            <svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+              <circle cx="60" cy="45" r="4" fill="#4f46e5"/><circle cx="72" cy="58" r="4" fill="#4f46e5"/><circle cx="55" cy="62" r="4" fill="#4f46e5"/><circle cx="68" cy="40" r="4" fill="#4f46e5"/><circle cx="48" cy="50" r="4" fill="#4f46e5"/>
+              <circle cx="180" cy="40" r="4" fill="#0ea5e9"/><circle cx="195" cy="52" r="4" fill="#0ea5e9"/><circle cx="172" cy="55" r="4" fill="#0ea5e9"/><circle cx="188" cy="35" r="4" fill="#0ea5e9"/><circle cx="202" cy="42" r="4" fill="#0ea5e9"/>
+              <circle cx="120" cy="95" r="4" fill="#10b981"/><circle cx="135" cy="100" r="4" fill="#10b981"/><circle cx="128" cy="86" r="4" fill="#10b981"/><circle cx="142" cy="92" r="4" fill="#10b981"/>
+              <circle cx="235" cy="100" r="3" fill="#475569"/><circle cx="30" cy="100" r="3" fill="#475569"/>
+              <circle cx="60" cy="45" r="24" fill="none" stroke="#4f46e5" stroke-opacity=".35" stroke-dasharray="3 3"/>
+            </svg>
+          </div>
+          <div class="card-body">
+            <h3>DBSCAN <span class="badge ready">Готово</span></h3>
+            <p>Плотностная кластеризация. Находит кластеры произвольной формы и помечает выбросы как шум.</p>
+          </div>
+        </a>
+
+        <a class="card ready" href="viz/kmeans/index.html">
+          <div class="thumb">
+            <svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+              <line x1="62" y1="46" x2="40" y2="30" stroke="#f59e0b" stroke-opacity=".4"/><line x1="62" y1="46" x2="80" y2="32" stroke="#f59e0b" stroke-opacity=".4"/><line x1="62" y1="46" x2="50" y2="62" stroke="#f59e0b" stroke-opacity=".4"/>
+              <line x1="195" y1="60" x2="175" y2="46" stroke="#ef4444" stroke-opacity=".4"/><line x1="195" y1="60" x2="215" y2="50" stroke="#ef4444" stroke-opacity=".4"/><line x1="195" y1="60" x2="205" y2="80" stroke="#ef4444" stroke-opacity=".4"/>
+              <line x1="120" y1="100" x2="100" y2="90" stroke="#10b981" stroke-opacity=".4"/><line x1="120" y1="100" x2="140" y2="95" stroke="#10b981" stroke-opacity=".4"/>
+              <circle cx="40" cy="30" r="4" fill="#f59e0b"/><circle cx="80" cy="32" r="4" fill="#f59e0b"/><circle cx="50" cy="62" r="4" fill="#f59e0b"/>
+              <circle cx="175" cy="46" r="4" fill="#ef4444"/><circle cx="215" cy="50" r="4" fill="#ef4444"/><circle cx="205" cy="80" r="4" fill="#ef4444"/>
+              <circle cx="100" cy="90" r="4" fill="#10b981"/><circle cx="140" cy="95" r="4" fill="#10b981"/>
+              <rect x="57" y="41" width="10" height="10" fill="#f59e0b" stroke="#fff" stroke-width="2" transform="rotate(45 62 46)"/>
+              <rect x="190" y="55" width="10" height="10" fill="#ef4444" stroke="#fff" stroke-width="2" transform="rotate(45 195 60)"/>
+              <rect x="115" y="95" width="10" height="10" fill="#10b981" stroke="#fff" stroke-width="2" transform="rotate(45 120 100)"/>
+            </svg>
+          </div>
+          <div class="card-body">
+            <h3>K-Means <span class="badge ready">Готово</span></h3>
+            <p>Центроиды, шаги assign → update и сходимость кластеров.</p>
+          </div>
+        </a>
+
+        <a class="card ready" href="viz/hierarchical/index.html">
+          <div class="thumb">
+            <svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+              <path d="M55 50 L70 65 L90 48 M70 65 L120 80 M120 80 L165 60 M165 60 L150 45 M165 60 L185 75 M120 80 L110 100" stroke="#4f46e5" stroke-opacity=".35" stroke-width="1.6" fill="none"/>
+              <circle cx="55" cy="50" r="4" fill="#4f46e5"/><circle cx="90" cy="48" r="4" fill="#4f46e5"/><circle cx="70" cy="65" r="4" fill="#4f46e5"/>
+              <circle cx="150" cy="45" r="4" fill="#0ea5e9"/><circle cx="185" cy="75" r="4" fill="#0ea5e9"/><circle cx="165" cy="60" r="4" fill="#0ea5e9"/>
+              <circle cx="110" cy="100" r="4" fill="#10b981"/><circle cx="120" cy="80" r="4" fill="#10b981"/>
+              <circle cx="230" cy="40" r="3.5" fill="#cbd5e1"/><circle cx="40" cy="100" r="3.5" fill="#cbd5e1"/>
+            </svg>
+          </div>
+          <div class="card-body">
+            <h3>Иерархическая <span class="badge ready">Готово</span></h3>
+            <p>Агломеративные слияния, linkage и срез дерева на K кластеров.</p>
+          </div>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- Деревья и ансамбли -->
+    <section class="section" id="trees">
+      <div class="section-head"><h2>Деревья и ансамбли</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/dtree/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <rect x="0" y="0" width="150" height="132" fill="#4f46e5" opacity=".16"/><rect x="150" y="0" width="130" height="70" fill="#ef4444" opacity=".16"/><rect x="150" y="70" width="130" height="62" fill="#10b981" opacity=".16"/>
+            <circle cx="60" cy="50" r="4" fill="#4f46e5"/><circle cx="90" cy="80" r="4" fill="#4f46e5"/><circle cx="45" cy="95" r="4" fill="#4f46e5"/><circle cx="200" cy="40" r="4" fill="#ef4444"/><circle cx="230" cy="55" r="4" fill="#ef4444"/><circle cx="210" cy="100" r="4" fill="#10b981"/><circle cx="245" cy="95" r="4" fill="#10b981"/>
+          </svg></div>
+          <div class="card-body"><h3>Дерево решений <span class="badge ready">Готово</span></h3><p>Осевые сплиты, критерий Джини/энтропия, рост дерева и переобучение.</p></div>
+        </a>
+        <a class="card ready" href="viz/forest/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M0 70 Q70 30 140 66 T280 60 L280 132 L0 132 Z" fill="#10b981" opacity=".16"/><path d="M0 0 L280 0 L280 60 Q210 96 140 66 Q70 30 0 70 Z" fill="#4f46e5" opacity=".16"/>
+            <path d="M0 66 Q70 26 140 62 T280 56" fill="none" stroke="#4f46e5" stroke-opacity=".4" stroke-width="2"/>
+            <circle cx="70" cy="40" r="4" fill="#4f46e5"/><circle cx="110" cy="30" r="4" fill="#4f46e5"/><circle cx="180" cy="95" r="4" fill="#10b981"/><circle cx="220" cy="100" r="4" fill="#10b981"/>
+          </svg></div>
+          <div class="card-body"><h3>Random Forest <span class="badge ready">Готово</span></h3><p>Bootstrap + случайные признаки: зубчатые деревья → гладкая граница ансамбля.</p></div>
+        </a>
+        <div class="card soon">
+          <div class="thumb"><svg viewBox="0 0 280 132"><path d="M20 100 Q80 90 130 60 T260 35" stroke="#cbd5e1" stroke-width="2" fill="none"/><circle cx="60" cy="95" r="4" fill="#94a3b8"/><circle cx="130" cy="60" r="4" fill="#94a3b8"/><circle cx="200" cy="45" r="4" fill="#94a3b8"/></svg></div>
+          <div class="card-body"><h3>Градиентный бустинг <span class="badge soon">Скоро</span></h3><p>Последовательное исправление остатков, learning rate.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Метрические -->
+    <section class="section" id="metric">
+      <div class="section-head"><h2>Метрические алгоритмы</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/knn/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <rect x="0" y="0" width="140" height="132" fill="#4f46e5" opacity=".14"/><rect x="140" y="0" width="140" height="132" fill="#ef4444" opacity=".14"/>
+            <circle cx="140" cy="66" r="6" fill="none" stroke="#14171c" stroke-width="2"/>
+            <line x1="140" y1="66" x2="110" y2="48" stroke="#4f46e5" stroke-opacity=".5"/><line x1="140" y1="66" x2="120" y2="86" stroke="#4f46e5" stroke-opacity=".5"/><line x1="140" y1="66" x2="172" y2="52" stroke="#ef4444" stroke-opacity=".5"/>
+            <circle cx="110" cy="48" r="4" fill="#4f46e5"/><circle cx="120" cy="86" r="4" fill="#4f46e5"/><circle cx="172" cy="52" r="4" fill="#ef4444"/></svg></div>
+          <div class="card-body"><h3>k-NN <span class="badge ready">Готово</span></h3><p>Голосование k ближайших соседей, метрики расстояний, карта решений.</p></div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Линейные модели -->
+    <section class="section" id="linear">
+      <div class="section-head"><h2>Линейные модели</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/svm/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M40 132 L240 0" stroke="#14171c" stroke-width="2"/><path d="M70 132 L270 0" stroke="#94a3b8" stroke-dasharray="4 4"/><path d="M10 132 L210 0" stroke="#94a3b8" stroke-dasharray="4 4"/>
+            <circle cx="90" cy="40" r="4" fill="#4f46e5"/><circle cx="120" cy="30" r="5" fill="#4f46e5" stroke="#14171c"/><circle cx="180" cy="100" r="5" fill="#ef4444" stroke="#14171c"/><circle cx="210" cy="95" r="4" fill="#ef4444"/></svg></div>
+          <div class="card-body"><h3>SVM <span class="badge ready">Готово</span></h3><p>Разделяющая полоса, опорные векторы, мягкий отступ C, ядерный трюк (RBF).</p></div>
+        </a>
+        <a class="card ready" href="viz/logreg/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M0 0 L280 0 L280 132 L0 132 Z" fill="#4f46e5" opacity=".04"/>
+            <path d="M20 110 C120 110 160 22 260 22" stroke="#4f46e5" stroke-width="2.5" fill="none"/>
+            <circle cx="70" cy="105" r="4" fill="#4f46e5"/><circle cx="110" cy="95" r="4" fill="#4f46e5"/><circle cx="190" cy="35" r="4" fill="#ef4444"/><circle cx="225" cy="28" r="4" fill="#ef4444"/></svg></div>
+          <div class="card-body"><h3>Логистическая регрессия <span class="badge ready">Готово</span></h3><p>Сигмоида, лог-лосс, граница решений и градиентный спуск.</p></div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Регрессия -->
+    <section class="section" id="regression">
+      <div class="section-head"><h2>Регрессия и метрики</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/linreg/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M20 110 L260 30" stroke="#4f46e5" stroke-width="2.5"/>
+            <line x1="70" y1="95" x2="70" y2="78" stroke="#ef4444" stroke-opacity=".5"/><line x1="140" y1="72" x2="140" y2="88" stroke="#ef4444" stroke-opacity=".5"/><line x1="200" y1="50" x2="200" y2="38" stroke="#ef4444" stroke-opacity=".5"/>
+            <circle cx="70" cy="78" r="4" fill="#14171c"/><circle cx="140" cy="88" r="4" fill="#14171c"/><circle cx="200" cy="38" r="4" fill="#14171c"/></svg></div>
+          <div class="card-body"><h3>Линейная регрессия <span class="badge ready">Готово</span></h3><p>МНК, остатки, MSE/MAE/RMSE/R², устойчивость к выбросам.</p></div>
+        </a>
+        <a class="card ready" href="viz/regmetrics/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <rect x="40" y="70" width="26" height="50" fill="#4f46e5" opacity=".7"/><rect x="86" y="40" width="26" height="80" fill="#0ea5e9" opacity=".7"/><rect x="132" y="55" width="26" height="65" fill="#10b981" opacity=".7"/><rect x="178" y="25" width="26" height="95" fill="#f59e0b" opacity=".7"/><rect x="224" y="80" width="26" height="40" fill="#ef4444" opacity=".7"/></svg></div>
+          <div class="card-body"><h3>Метрики регрессии <span class="badge ready">Готово</span></h3><p>Как выброс ломает MSE/RMSE и щадит MAE — вживую.</p></div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Метрики классификации -->
+    <section class="section" id="metrics">
+      <div class="section-head"><h2>Качество классификации</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/roc/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M40 120 L40 20 L240 20" stroke="#e7eaf0" stroke-width="1.5" fill="none"/>
+            <path d="M40 120 C60 60 120 30 240 20" stroke="#4f46e5" stroke-width="2.5" fill="none"/>
+            <path d="M40 120 L240 20" stroke="#cbd5e1" stroke-dasharray="4 4"/>
+            <circle cx="95" cy="62" r="4" fill="#4f46e5"/></svg></div>
+          <div class="card-body"><h3>ROC и метрики <span class="badge ready">Готово</span></h3><p>Порог решения, матрица ошибок, precision/recall, ROC-AUC.</p></div>
+        </a>
+      </div>
+    </section>
+
+    <!-- Оптимизация -->
+    <section class="section" id="optim">
+      <div class="section-head"><h2>Оптимизация</h2><span class="rule"></span></div>
+      <div class="grid">
+        <a class="card ready" href="viz/gd/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <ellipse cx="160" cy="66" rx="100" ry="48" fill="none" stroke="#cbd5e1"/><ellipse cx="160" cy="66" rx="64" ry="30" fill="none" stroke="#cbd5e1"/><ellipse cx="160" cy="66" rx="30" ry="14" fill="none" stroke="#cbd5e1"/>
+            <path d="M55 30 L95 48 L125 60 L150 66" stroke="#4f46e5" stroke-width="2" fill="none"/>
+            <circle cx="55" cy="30" r="4" fill="#4f46e5"/><circle cx="150" cy="66" r="4" fill="#ef4444"/></svg></div>
+          <div class="card-body"><h3>Градиентный спуск <span class="badge ready">Готово</span></h3><p>Линии уровня, шаги, learning rate, momentum и расходимость.</p></div>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      Собрано локально · vanilla JS + canvas, без сборки · референс — <a href="https://www.naftaliharris.com/blog/visualizing-dbscan-clustering/" target="_blank" rel="noopener">Visualizing DBSCAN</a>
+    </div>
+  </footer>
+</body>
+</html>
