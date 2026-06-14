@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Градиентный спуск — ML-виз</title>
-  <link rel="stylesheet" href="../../assets/css/main.css" />
-  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/css/main.css?v=2" />
+  <link rel="stylesheet" href="../../assets/css/viz.css?v=2" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
     /* Специфика страницы градиентного спуска (инлайн, общие css не трогаем) */
@@ -97,7 +97,7 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Оптимизация · Градиентный спуск</div>
       <h1>Градиентный спуск</h1>
-      <p><b>Оптимизация</b> ищет минимум функции потерь <span class="formula">L(x,y)</span>, шагая против градиента: <span class="formula">θ ← θ − η·∇L</span>. Шаг задаёт <b>learning rate</b> <span class="formula">η</span>: малый — медленно ползёт, большой — осцилляция и <b>расходимость</b>. <b>Импульс (momentum)</b> накапливает скорость и быстрее проходит узкий овраг Розенброка. Линии уровня — это «горизонтали» рельефа потерь; чем гуще — тем круче склон.</p>
+      <p><b>Оптимизация</b> ищет минимум функции потерь <span class="formula">L(x,y)</span>, шагая против градиента: <span class="formula">θ ← θ − η·∇L</span>. Шаг задаёт <b>learning rate</b> <span class="formula">η</span>: малый — медленно ползёт, большой — осцилляция и <b>расходимость</b>. <b>Импульс (momentum)</b> накапливает скорость и быстрее проходит узкие овраги (хребты и каньоны). Линии уровня — это «горизонтали» рельефа потерь; чем гуще — тем круче склон.</p>
     </div>
 
     <div class="lab-grid">
@@ -206,8 +206,8 @@
     </div>
   </main>
 
-  <script src="gd.js"></script>
-  <script src="gd3d.js"></script>
-  <script src="app.js"></script>
+  <script src="gd.js?v=2"></script>
+  <script src="gd3d.js?v=2"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

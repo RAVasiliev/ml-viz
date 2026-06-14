@@ -327,8 +327,11 @@
     this.minima = fn.minima || [];
     const su = fn.domain.umax - fn.domain.umin, sv = fn.domain.vmax - fn.domain.vmin;
     this.targetEps = 0.04 * Math.hypot(su, sv);  // «окрестность цели» — 4% диагонали домена
-    this.moveTol = 6e-4 * Math.hypot(su, sv);     // «осел» — шаг почти нулевой
+    this.moveTol = 3e-4 * Math.hypot(su, sv);     // «осел» — шаг почти нулевой (доходим до самого дна)
     this.nearTarget = false;
+    // границы поля (+12% запас): за ними — расходимость, чтобы точка не улетала за картинку
+    this.loU = fn.domain.umin - 0.12 * su; this.hiU = fn.domain.umax + 0.12 * su;
+    this.loV = fn.domain.vmin - 0.12 * sv; this.hiV = fn.domain.vmax + 0.12 * sv;
 
     const s = opts.start;
     this.u = s.u; this.v = s.v;
@@ -381,8 +384,8 @@
     } else { du = -this.lr * g[0]; dv = -this.lr * g[1]; }
 
     const nu = this.u + du, nv = this.v + dv;
-    if (!isFinite(nu) || !isFinite(nv) || Math.abs(nu) > this.maxNorm || Math.abs(nv) > this.maxNorm) {
-      this.diverged = true; this.done = true; return;
+    if (!isFinite(nu) || !isFinite(nv) || nu < this.loU || nu > this.hiU || nv < this.loV || nv > this.hiV) {
+      this.diverged = true; this.done = true; return;   // ушли за пределы поля — стоп (не улетаем за картинку)
     }
     this.u = nu; this.v = nv; this.step++;
     this.path.push({ u: nu, v: nv });
@@ -391,10 +394,15 @@
     const gf = fn.grad(nu, nv);               // полный градиент — для статистики/сходимости
     this.gnorm = Math.hypot(gf[0], gf[1]);
     this.L = fn.L(nu, nv);
-    // останов, как только оказались в окрестности цели (работает и для SGD)
-    if (this._distMin(nu, nv) < this.targetEps) { this.converged = true; this.nearTarget = true; this.done = true; }
-    // либо спуск «осел» (шаг почти нулевой) в локальном минимуме — только для полного батча
-    else if (this.batchMode === "full" && Math.hypot(du, dv) < this.moveTol && this.step > 3) { this.converged = true; this.done = true; }
+    if (this.batchMode === "full") {
+      // точный спуск: ждём, пока шаг почти обнулится — доходим до самого минимума
+      if (Math.hypot(du, dv) < this.moveTol && this.step > 3) {
+        this.converged = true; this.done = true; this.nearTarget = this._distMin(nu, nv) < this.targetEps;
+      }
+    } else if (this._distMin(nu, nv) < this.targetEps) {
+      // шумный режим (SGD/mini): точно не сходится — стоп при входе в окрестность цели
+      this.converged = true; this.nearTarget = true; this.done = true;
+    }
   };
 
   GDStepper.prototype._distMin = function (u, v) {

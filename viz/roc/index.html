@@ -3,13 +3,19 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Болен или здоров? Порог, Accuracy, Precision, Recall, F1 — ML-виз</title>
-  <link rel="stylesheet" href="../../assets/css/main.css" />
-  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <title>Метрики классификации: болен или здоров? — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css?v=2" />
+  <link rel="stylesheet" href="../../assets/css/viz.css?v=2" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
-    .lead { font-size:15.5px; line-height:1.55; color:var(--muted); max-width:800px; }
+    .lead { font-size:15.5px; line-height:1.62; color:var(--muted); }
+    .lab-head p.lead { max-width:none; }   /* перебиваем общий .lab-head p { max-width:720px } — лид во всю ширину */
     .lead b { color:var(--ink); }
+    .lead .katex { font-size:1.02em; color:var(--ink); }
+    .kf { display:inline-block; }
+    .mf .katex { font-size:1.02em; }
     .sick { color:#ef4444; } .healthy { color:#10b981; }
     .controls-bar { display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:14px; }
     .ctl { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink); }
@@ -68,9 +74,9 @@
 
   <main class="lab" style="max-width:1120px">
     <div class="lab-head">
-      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · Порог и метрики</div>
-      <h1>Болен или здоров?</h1>
-      <p class="lead">Тест выдаёт каждому человеку <b>вероятность, что он болен</b> (0…1). Решение «лечить?» — да/нет, поэтому выбираем <b>порог</b>: выше — <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. По высоте — <b>сколько людей</b> с такой вероятностью (гистограмма): <b class="healthy">зелёные</b> на самом деле здоровы, <b class="sick">красные</b> больны. <b>Двигай порог</b> — смотри ошибки и метрики.</p>
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Метрики качества · Классификация</div>
+      <h1>Метрики классификации: болен или здоров?</h1>
+      <p class="lead">Классификатор выдаёт каждому человеку <b>оценку</b> <span class="kf" data-tex="s(x)\in[0,1]"></span> — вероятность того, что он болен. Решение бинарно, поэтому фиксируем <b>порог</b> <span class="kf" data-tex="\tau"></span> и предсказываем <span class="kf" data-tex="\hat{y}=\mathbf{1}\,[\,s(x)\ge\tau\,]"></span>: выше порога — <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. Сравнив прогноз <span class="kf" data-tex="\hat{y}"></span> с истиной <span class="kf" data-tex="y\in\{0,1\}"></span>, каждый человек попадает в одну клетку <b>матрицы ошибок</b> — <b>TP, FP, FN, TN</b>; из этих четырёх чисел и считаются метрики <b style="color:#475569">Accuracy</b>, <b style="color:#0ea5e9">Precision</b>, <b style="color:#4f46e5">Recall</b> и <b style="color:#8b5cf6">F1</b>. На гистограмме высота — <b>сколько людей</b> с такой оценкой (<b class="healthy">зелёные</b> здоровы, <b class="sick">красные</b> больны). Порог <span class="kf" data-tex="\tau"></span> — это <b>компромисс</b>: двигай его и смотри, как меняются ошибки и метрики.</p>
     </div>
 
     <div class="controls-bar">
@@ -147,6 +153,6 @@
     <div class="note-box" id="note"></div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=2"></script>
 </body>
 </html>

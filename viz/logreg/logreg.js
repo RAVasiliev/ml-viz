@@ -1,138 +1,104 @@
-/* Логистическая регрессия: обучение полным градиентным спуском по лог-лоссу.
-   Модель  p(x) = σ(w·φ(x) + b),  σ(z) = 1/(1+e^{-z}).
-   Минимизируется кросс-энтропия (= −лог-правдоподобие) с L2-регуляризацией.
-   Один step() = одна итерация полного градиентного спуска по всей выборке.
-
-   Метки приходят как {0,1}; внутри обучаем p=P(y=1|x). φ(x) — расширение
-   признаков: degree 1 → (x, y); degree 2 → (x, y, x², xy, y²). Bias b отдельно
-   и НЕ штрафуется L2. */
+/* Логистическая регрессия, обучение полным градиентным спуском по лог-лоссу.
+   Модель  p(x) = σ(w·(x−c)),  σ(z)=1/(1+e^{−z}). Признаки центрированы в среднем
+   данных c — поэтому всего ДВА веса (w1, w2) и нет отдельного bias: граница
+   проходит через центроид. Это даёт честную 2D-поверхность лог-лосса L(w1,w2),
+   по которой видно спуск. Минимизируется кросс-энтропия + L2·λ.
+   Один step() = одна итерация полного градиентного спуска по всей выборке. */
 (function () {
   "use strict";
 
   function sigma(z) {
-    // численно устойчивая сигмоида
     if (z >= 0) { const e = Math.exp(-z); return 1 / (1 + e); }
     const e = Math.exp(z); return e / (1 + e);
   }
 
-  // φ(x): возвращает массив признаков фиксированной длины d по точке (px,py).
-  function featurize(px, py, degree) {
-    if (degree === 2) return [px, py, px * px, px * py, py * py];
-    return [px, py];
-  }
-
-  function LogRegStepper(points, labels, opts) {
+  function LogReg(points, labels, opts) {
     opts = opts || {};
-    this.lr = opts.lr != null ? opts.lr : 0.5;          // learning rate η
-    this.lambda = opts.lambda != null ? opts.lambda : 0; // L2 λ
-    this.degree = opts.degree === 2 ? 2 : 1;
-    this.maxIter = opts.maxIter != null ? opts.maxIter : 400;
-
+    this.lr = opts.lr != null ? opts.lr : 0.5;
+    this.lambda = opts.lambda != null ? opts.lambda : 0.04;
+    this.maxIter = opts.maxIter != null ? opts.maxIter : 600;
     this.n = points.length;
-    this.degreeDim = this.degree === 2 ? 5 : 2;
 
-    // признаки и метки {0,1}
+    let cx = 0, cy = 0;
+    for (const p of points) { cx += p.x; cy += p.y; }
+    cx /= this.n || 1; cy /= this.n || 1;
+    this.cx = cx; this.cy = cy;
+
     this.Phi = new Array(this.n);
     this.y = new Float64Array(this.n);
     for (let i = 0; i < this.n; i++) {
-      const p = points[i];
-      this.Phi[i] = featurize(p.x, p.y, this.degree);
+      this.Phi[i] = [points[i].x - cx, points[i].y - cy];
       this.y[i] = labels[i] > 0 ? 1 : 0;
     }
-
     this.reset();
   }
 
-  LogRegStepper.prototype.reset = function () {
-    this.w = new Float64Array(this.degreeDim);  // нули — старт из «незнания»
-    this.b = 0;
+  LogReg.prototype.reset = function () {
+    this.w = [0, 0];                 // старт из «незнания»
     this.iter = 0;
     this.done = false;
-    this.loss = this._logLoss();
-    this.history = [this.loss];                 // лог-лосс по итерациям
+    this.loss = this.lossW(0, 0);
+    this.history = [this.loss];      // лог-лосс по итерациям
+    this.wHist = [[0, 0]];           // траектория весов (для поверхности)
   };
 
-  // z = w·φ(x) + b
-  LogRegStepper.prototype._z = function (phi) {
-    let z = this.b;
-    const w = this.w;
-    for (let k = 0; k < w.length; k++) z += w[k] * phi[k];
-    return z;
+  // p(x) = σ(w·(x−c)) для нормированной точки
+  LogReg.prototype.proba = function (px, py) {
+    return sigma(this.w[0] * (px - this.cx) + this.w[1] * (py - this.cy));
   };
 
-  // p(x) = σ(z) для нормированной точки (px,py)
-  LogRegStepper.prototype.proba = function (px, py) {
-    return sigma(this._z(featurize(px, py, this.degree)));
-  };
-
-  // средний лог-лосс (кросс-энтропия) + L2-член на веса (без bias)
-  LogRegStepper.prototype._logLoss = function () {
+  // средний лог-лосс + L2 для ПРОИЗВОЛЬНЫХ весов (используется и для heatmap-поверхности)
+  LogReg.prototype.lossW = function (a, b) {
     const n = this.n; if (n === 0) return 0;
     let s = 0;
     for (let i = 0; i < n; i++) {
-      const p = sigma(this._z(this.Phi[i]));
-      const yi = this.y[i];
-      // −[y·log p + (1−y)·log(1−p)] с защитой от log(0)
+      const z = a * this.Phi[i][0] + b * this.Phi[i][1];
+      const p = sigma(z), yi = this.y[i];
       const pc = Math.min(1 - 1e-12, Math.max(1e-12, p));
       s += -(yi * Math.log(pc) + (1 - yi) * Math.log(1 - pc));
     }
-    let reg = 0;
-    if (this.lambda > 0) { for (let k = 0; k < this.w.length; k++) reg += this.w[k] * this.w[k]; }
-    return s / n + 0.5 * this.lambda * reg;
+    return s / n + 0.5 * this.lambda * (a * a + b * b);
   };
 
-  // одна итерация полного градиентного спуска
-  LogRegStepper.prototype.step = function () {
+  LogReg.prototype.step = function () {
     if (this.done) return;
-    const n = this.n;
-    if (n === 0) { this.done = true; return; }
-
-    const d = this.w.length;
-    const gw = new Float64Array(d);
-    let gb = 0;
-    // ∂L/∂w = 1/n Σ (p_i − y_i)·φ_i ;  ∂L/∂b = 1/n Σ (p_i − y_i)
+    const n = this.n; if (n === 0) { this.done = true; return; }
+    let g0 = 0, g1 = 0;
     for (let i = 0; i < n; i++) {
       const phi = this.Phi[i];
-      const p = sigma(this._z(phi));
+      const p = sigma(this.w[0] * phi[0] + this.w[1] * phi[1]);
       const e = p - this.y[i];
-      for (let k = 0; k < d; k++) gw[k] += e * phi[k];
-      gb += e;
+      g0 += e * phi[0]; g1 += e * phi[1];
     }
-    const lr = this.lr;
-    for (let k = 0; k < d; k++) {
-      gw[k] = gw[k] / n + this.lambda * this.w[k]; // L2-градиент (bias не штрафуем)
-      this.w[k] -= lr * gw[k];
-    }
-    this.b -= lr * (gb / n);
+    g0 = g0 / n + this.lambda * this.w[0];
+    g1 = g1 / n + this.lambda * this.w[1];
+    this.w[0] -= this.lr * g0;
+    this.w[1] -= this.lr * g1;
 
     this.iter++;
-    this.loss = this._logLoss();
+    this.loss = this.lossW(this.w[0], this.w[1]);
     this.history.push(this.loss);
-    if (this.history.length > 4000) this.history.shift();
+    this.wHist.push([this.w[0], this.w[1]]);
+    if (this.history.length > 6000) { this.history.shift(); this.wHist.shift(); }
+
     if (this.iter >= this.maxIter) this.done = true;
+    else if (this.history.length > 2 && Math.abs(this.history[this.history.length - 2] - this.loss) < 1e-8) this.done = true;
   };
 
-  // доля верных при пороге 0.5
-  LogRegStepper.prototype.accuracy = function () {
+  LogReg.prototype.accuracy = function () {
     const n = this.n; if (n === 0) return 0;
     let ok = 0;
     for (let i = 0; i < n; i++) {
-      const p = sigma(this._z(this.Phi[i]));
-      const pred = p >= 0.5 ? 1 : 0;
-      if (pred === this.y[i]) ok++;
+      const p = sigma(this.w[0] * this.Phi[i][0] + this.w[1] * this.Phi[i][1]);
+      if ((p >= 0.5 ? 1 : 0) === this.y[i]) ok++;
     }
     return ok / n;
   };
-
-  LogRegStepper.prototype.stats = function () {
-    return {
-      iter: this.iter,
-      loss: this.loss,
-      acc: this.accuracy(),
-      done: this.done,
-    };
+  LogReg.prototype.wnorm = function () { return Math.hypot(this.w[0], this.w[1]); };
+  LogReg.prototype.stats = function () {
+    return { iter: this.iter, loss: this.loss, acc: this.accuracy(), done: this.done, wnorm: this.wnorm() };
   };
 
-  window.LogRegStepper = LogRegStepper;
+  window.LogRegStepper = LogReg;
   window.LogRegStepper.sigma = sigma;
 })();

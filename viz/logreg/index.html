@@ -10,39 +10,33 @@
   <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
-    /* две под-панели рядом: сигмоида + кривая лог-лосса */
-    .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
-    @media (max-width: 560px) { .sub-grid { grid-template-columns: 1fr; } }
-    .sub-host { height: 168px; }
-
-    /* вводный текст с душой */
-    .lead { font-size:15.5px; line-height:1.6; color:var(--muted); max-width:780px; }
+    .lab-head p.lead { font-size:15px; line-height:1.55; color:var(--muted); max-width:none; }
     .lead b { color:var(--ink); }
 
-    /* блок формул KaTeX */
-    .formula-card { background:var(--surface); border:1px solid var(--line); border-radius:14px;
-      padding:16px 18px; margin-top:18px; box-shadow:var(--shadow-sm); max-width:780px; }
-    .formula-card .ftitle { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
-      color:var(--faint); margin-bottom:6px; }
-    .frow { display:grid; grid-template-columns:auto 1fr; gap:12px 16px; align-items:center; }
-    @media (max-width:560px){ .frow { grid-template-columns:1fr; gap:4px 0; } }
-    .frow .kf { margin:6px 0; }
-    .frow .fgloss { font-size:13px; line-height:1.5; color:var(--muted); }
-    .frow .fgloss b { color:var(--ink); }
-    .kf { margin:8px 0; overflow-x:auto; overflow-y:hidden; }
-    .katex { font-size:1.05em; }
+    /* каты (раскрывающиеся блоки) — как в ROC-AUC */
+    .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 4px; }
+    @media (max-width:820px){ .cats { grid-template-columns:1fr; } }
+    .cat { border:1px solid var(--line); border-radius:11px; background:var(--surface); box-shadow:var(--shadow-sm); }
+    .cat > summary { cursor:pointer; padding:11px 15px; font-weight:650; font-size:14px; list-style:none; display:flex; align-items:center; gap:9px; }
+    .cat > summary::-webkit-details-marker { display:none; }
+    .cat > summary::before { content:"▸"; color:var(--accent); font-size:12px; transition:transform .15s; }
+    .cat[open] > summary::before { transform:rotate(90deg); }
+    .cat .cb { padding:0 16px 14px; font-size:13.5px; line-height:1.55; color:var(--muted); }
+    .cat .cb b { color:var(--ink); }
+    .frow { display:grid; grid-template-columns:auto 1fr; gap:8px 16px; align-items:center; }
+    @media (max-width:560px){ .frow { grid-template-columns:1fr; gap:2px 0; } }
+    .kf { margin:5px 0; overflow-x:auto; overflow-y:hidden; } .katex { font-size:1.04em; }
+    .ilist { margin:0; padding:0; list-style:none; }
+    .ilist li { font-size:13.5px; line-height:1.5; color:var(--muted); margin-bottom:9px; padding-left:22px; position:relative; }
+    .ilist li::before { content:"→"; position:absolute; left:2px; top:0; color:var(--accent); font-weight:700; }
+    .ilist li b { color:var(--ink); }
+    .tag { display:inline-block; font-family:var(--mono); font-size:12px; font-weight:650;
+      background:var(--accent-soft); color:var(--accent); border-radius:6px; padding:0 6px; }
 
-    /* панель интуиции */
-    .intuition { background:#fffbeb; border:1px solid #fde68a; border-radius:14px;
-      padding:14px 18px 6px; margin-top:18px; max-width:780px; }
-    .intuition .ititle { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
-      color:#92400e; margin-bottom:8px; }
-    .intuition ul { margin:0 0 8px; padding-left:0; list-style:none; }
-    .intuition li { font-size:14px; line-height:1.55; color:#713f12; margin-bottom:9px; padding-left:24px; position:relative; }
-    .intuition li::before { content:"→"; position:absolute; left:4px; top:0; color:#b45309; font-weight:700; }
-    .intuition li b { color:#92400e; }
-    .intuition .tag { display:inline-block; font-family:var(--mono); font-size:12px; font-weight:650;
-      background:#fef3c7; color:#92400e; border:1px solid #fcd34d; border-radius:6px; padding:0 6px; }
+    /* под-панели: тепловая карта потерь + кривая лог-лосса */
+    .sub-grid { display:grid; grid-template-columns:1.25fr 1fr; gap:12px; margin-top:14px; }
+    @media (max-width:620px){ .sub-grid { grid-template-columns:1fr; } }
+    .sub-host { height:230px; }
   </style>
 </head>
 <body>
@@ -56,35 +50,38 @@
     </div>
   </header>
 
-  <main class="lab">
+  <main class="lab" style="max-width:1180px">
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Линейные · Логистическая регрессия</div>
       <h1>Логистическая регрессия</h1>
-      <p class="lead">Письмо пришло — <b>спам или нет?</b> Клиент банка — <b>уйдёт или останется?</b> Честный ответ тут не «да/нет», а <b>насколько вероятно</b>: «спам на 92%», «уйдёт на 30%». Логистическая регрессия и выдаёт это число — вероятность класса 1. Сначала она складывает признаки в одно число <b>z = w·φ(x)+b</b> (логит — насколько сильно объект «за» класс 1), а потом продавливает его через <b>сигмоиду σ</b> в коридор (0, 1). Учится, подбирая веса <b>w</b> так, чтобы <b>лог-лосс</b> был минимален — то есть чтобы за уверенные предсказания, попавшие <b>мимо</b>, платить дороже всего. На карте: <b>заливка фона</b> — это сама вероятность p(x), от синего (0) к красному (1), а <b>белый контур</b> — линия сомнения <b>p = 0.5</b>, где модель не знает ответа. Двинь <span class="tag">φ</span> на 2 — добавятся признаки x², xy, y², и прямая линия согнётся в дугу, разделяющую «Кольца» и XOR.</p>
+      <p class="lead">Модель выдаёт не «да/нет», а <b>вероятность</b> класса 1. Веса подбираются <b>градиентным спуском</b>, минимизируя <b>лог-лосс</b>. Жми <span class="tag">Запуск</span> — и смотри, как граница встаёт между классами (сверху), а веса <b>спускаются на дно</b> поверхности потерь (снизу).</p>
+    </div>
 
-      <div class="formula-card">
-        <div class="ftitle">Что считает модель</div>
-        <div class="frow">
-          <div class="kf" data-tex="\sigma(z)=\dfrac{1}{1+e^{-z}}" data-block></div>
-          <div class="fgloss"><b>Сигмоида.</b> Берёт любое z (от −∞ до +∞) и мягко сжимает в (0, 1). Большое z → почти 1, около нуля → ≈0.5, сильно отрицательное → почти 0. Это её график на нижней левой панели.</div>
-
-          <div class="kf" data-tex="p=\sigma(w^{\top}x+b)" data-block></div>
-          <div class="fgloss"><b>Вероятность класса 1.</b> Сначала линейная комбинация признаков <b>z = w·x+b</b> (логит), затем сигмоида превращает его в вероятность <b>p</b>. Граница <b>p = 0.5</b> — это ровно <b>z = 0</b>, белая линия на карте.</div>
-
-          <div class="kf" data-tex="\mathcal{L}=-\frac1n\sum_i\big[y_i\log p_i+(1-y_i)\log(1-p_i)\big]" data-block></div>
-          <div class="fgloss"><b>Лог-лосс</b> (он же кросс-энтропия = −лог-правдоподобие). Для объекта класса 1 платим −log p, для класса 0 — −log(1−p). Уверенная ошибка (p≈0, а ответ 1) даёт огромный штраф. Градиентный спуск двигает <b>w</b> вниз по этой кривой — её падение видно на нижней правой панели.</div>
+    <div class="cats">
+      <details class="cat">
+        <summary>Как это работает · формулы</summary>
+        <div class="cb">
+          <div class="frow">
+            <div class="kf" data-tex="\sigma(z)=\dfrac{1}{1+e^{-z}}" data-block></div>
+            <div><b>Сигмоида.</b> Сжимает любое число z в коридор (0, 1): большое z → почти 1, около нуля → ≈0.5.</div>
+            <div class="kf" data-tex="p=\sigma(w^{\top}x+b)" data-block></div>
+            <div><b>Вероятность класса 1.</b> Сначала линейная комбинация признаков z = w·x+b (логит), потом сигмоида. Граница <b>p = 0.5</b> ⟺ <b>z = 0</b> — это белая линия на карте.</div>
+            <div class="kf" data-tex="\mathcal{L}=-\frac1n\sum_i\big[y_i\log p_i+(1-y_i)\log(1-p_i)\big]" data-block></div>
+            <div><b>Лог-лосс</b> (кросс-энтропия). За уверенную ошибку (p≈0, а ответ 1) — огромный штраф. Спуск по этой L(w) и видно на тепловой карте снизу.</div>
+          </div>
         </div>
-      </div>
-
-      <div class="intuition">
-        <div class="ititle">Что покрутить и на что смотреть</div>
-        <ul>
-          <li>Жми <span class="tag">Запуск</span> — справа внизу <b>лог-лосс L</b> поползёт вниз, а на карте заливка вероятности «разъедется» к двум полюсам и граница <b>p = 0.5</b> ляжет между классами. Обведённые точки — ошибки при пороге 0.5; их станет меньше.</li>
-          <li>Двинь <span class="tag">φ</span> с 1 на 2: при φ=1 граница — прямая (гиперплоскость <b>z = 0</b>), при φ=2 появляются x², xy, y² и она гнётся в кривую. На «Кольцах» прямая бессильна, а дуга обнимает внутренний класс.</li>
-          <li>Увеличивай <span class="tag">learning rate η</span> — обучение ускоряется, но при большом η кривая лог-лосса начинает «прыгать», а не плавно падать: шаг градиента перелетает минимум.</li>
-          <li>Добавь <span class="tag">L2 λ</span> — штраф ‖w‖² тянет веса к нулю: смотри на <b>‖w‖</b> в счётчиках (падает) и на сигмоиду слева — красная отметка <b>среднего логита</b> уезжает к центру, модель становится <b>менее</b> уверенной, но граница — глаже и устойчивее к переобучению.</li>
-        </ul>
-      </div>
+      </details>
+      <details class="cat">
+        <summary>Гиперпараметры: что крутить</summary>
+        <div class="cb">
+          <ul class="ilist">
+            <li><b>Learning rate η.</b> Размер шага спуска. Больше — быстрее, но при слишком большом точка на карте потерь начинает <b>прыгать</b> мимо минимума, а кривая лог-лосса дёргается вместо плавного падения.</li>
+            <li><b>L2-регуляризация λ.</b> Штраф ‖w‖² тянет веса к нулю: граница глаже, дно чаши <b>ближе к центру</b>. При λ = 0 на разделимых данных веса разгоняются «в бесконечность» (минимума нет) — поэтому регуляризация важна.</li>
+            <li><b>Датасет.</b> «С перекрытием» — классы налезают друг на друга: лог-лосс не падает в 0, часть точек неизбежно ошибочна (обведены).</li>
+            <li>Жми <span class="tag">Шаг ⏭</span> по одному и смотри одновременно: границу сверху и спуск точки <b>к ✕ (минимуму)</b> на поверхности снизу — это одно и то же обучение в двух видах.</li>
+          </ul>
+        </div>
+      </details>
     </div>
 
     <div class="lab-grid">
@@ -94,22 +91,14 @@
           <select id="dataset"></select>
         </div>
         <div class="control">
-          <label for="phi">Степень признаков φ</label>
-          <select id="phi">
-            <option value="1">1 — линейная граница</option>
-            <option value="2">2 — x², xy, y² (изогнутая)</option>
-          </select>
-          <div class="hint">φ(x): степень 1 — прямая, степень 2 — полиномиальные признаки, граница может быть кривой.</div>
-        </div>
-        <div class="control">
           <label for="lr">Learning rate η <span class="val" id="lrVal">0.50</span></label>
-          <input type="range" id="lr" min="0.02" max="3" step="0.02" value="0.5" />
+          <input type="range" id="lr" min="0.05" max="4" step="0.05" value="0.5" />
           <div class="hint">Шаг градиентного спуска. Больше — быстрее, но риск «прыжков».</div>
         </div>
         <div class="control">
-          <label for="lambda">L2 λ <span class="val" id="lambdaVal">0.00</span></label>
-          <input type="range" id="lambda" min="0" max="0.5" step="0.005" value="0" />
-          <div class="hint">Штраф за большие веса ‖w‖² — сглаживает границу, уменьшает переобучение.</div>
+          <label for="lambda">L2 λ <span class="val" id="lambdaVal">0.04</span></label>
+          <input type="range" id="lambda" min="0" max="0.5" step="0.005" value="0.04" />
+          <div class="hint">Штраф ‖w‖² — глаже граница, ближе минимум. λ=0 → веса «улетают».</div>
         </div>
         <div class="control">
           <label for="speed">Скорость <span class="val" id="speedVal">35</span></label>
@@ -144,8 +133,8 @@
 
         <div class="sub-grid">
           <div class="dendro-wrap" style="margin-top:0">
-            <div class="dendro-label">Сигмоида σ(z) · отметка — типичный логит обучения</div>
-            <div class="dendro-host sub-host"><canvas id="sigCv"></canvas></div>
+            <div class="dendro-label">Поверхность лог-лосса L(w) · ✕ минимум, точка — текущие веса, спуск виден</div>
+            <div class="dendro-host sub-host"><canvas id="surfCv"></canvas></div>
           </div>
           <div class="dendro-wrap" style="margin-top:0">
             <div class="dendro-label">Лог-лосс по итерациям · падает по мере обучения</div>
@@ -163,7 +152,6 @@
     </div>
   </main>
 
-  <script src="../../assets/js/datasets-labeled.js"></script>
   <script src="logreg.js"></script>
   <script src="app.js"></script>
   <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>

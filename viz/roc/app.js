@@ -9,6 +9,7 @@
   const SICK_D = "#b91c1c", HEALTHY_D = "#047857";
   const C_ACC = "#475569", C_F1 = "#8b5cf6", C_REC = "#4f46e5", C_PREC = "#0ea5e9";
   const $ = (s) => document.querySelector(s);
+  const KT = (tex) => (window.katex ? katex.renderToString(tex, { throwOnError: false, trust: true, strict: false }) : tex);
 
   const state = { sep: 0.24, balance: 0.4, count: 500, seed: 3, thr: 0.5, drag: null,
                   prev: { a: 0, p: 0, r: 0, f: 0 } };
@@ -248,10 +249,10 @@
 
     $("#aVal").textContent = pct(m.acc); $("#fVal").textContent = pct(m.f1);
     $("#rVal").textContent = pct(m.rec); $("#pVal").textContent = pct(m.prec);
-    $("#aFrac").textContent = `(TP+TN) / N = (${c.TP}+${c.TN}) / ${N}`;
-    $("#fFrac").textContent = `2·TP / (2·TP+FP+FN) = ${2 * c.TP} / ${2 * c.TP + c.FP + c.FN}`;
-    $("#rFrac").textContent = `TP / (TP+FN) = ${c.TP} / ${c.TP + c.FN}`;
-    $("#pFrac").textContent = `TP / (TP+FP) = ${c.TP} / ${c.TP + c.FP}`;
+    $("#aFrac").innerHTML = KT(`\\mathrm{Acc}=\\dfrac{TP+TN}{N}=\\dfrac{${c.TP}+${c.TN}}{${N}}`);
+    $("#fFrac").innerHTML = KT(`F_1=\\dfrac{2\\,TP}{2\\,TP+FP+FN}=\\dfrac{${2 * c.TP}}{${2 * c.TP + c.FP + c.FN}}`);
+    $("#rFrac").innerHTML = KT(`\\mathrm{Recall}=\\dfrac{TP}{TP+FN}=\\dfrac{${c.TP}}{${c.TP + c.FN}}`);
+    $("#pFrac").innerHTML = KT(`\\mathrm{Precision}=\\dfrac{TP}{TP+FP}=\\dfrac{${c.TP}}{${c.TP + c.FP}}`);
     setBar("#aBar", m.acc); setBar("#fBar", m.f1); setBar("#rBar", m.rec); setBar("#pBar", m.prec);
     arrow("#aArr", m.acc, "a"); arrow("#fArr", m.f1, "f"); arrow("#rArr", m.rec, "r"); arrow("#pArr", m.prec, "p");
 
@@ -296,6 +297,10 @@
   $("#newData").addEventListener("click", () => { state.seed = (state.seed * 1103515245 + 12345) >>> 0; rebuild(); });
 
   // ---------- старт ----------
+  // KaTeX-набор инлайн-формул в лиде (s(x), τ, ŷ = 1[s≥τ], y∈{0,1})
+  document.querySelectorAll('.kf[data-tex]').forEach((e) => {
+    try { katex.render(e.dataset.tex, e, { throwOnError: false, trust: true, strict: false }); } catch (err) {}
+  });
   $("#sepVal").textContent = "ср.";
   generate(); resize(); update();
 })();
