@@ -192,53 +192,111 @@
     };
   })();
 
-  // 12) Случайный рельеф — сумма гауссовых ям и холмов (процедурный ландшафт).
-  //     L = ½·b·(x²+y²) + Σ aₖ·exp(−‖p−cₖ‖²/2sₖ²);  градиент аналитический.
-  //     Каждый seed → новая карта. Глобальный минимум ищем по сетке + уточняем GD.
-  function makeTerrain(seed, bumps) {
+  // Общий «выпекатель»: ищет минимум по сетке (+ уточнение GD) и старт из высокой точки.
+  function bake(o) {
+    const L = o.L, grad = o.grad, dom = o.domain;
+    let best = { u: 0, v: 0, L: Infinity }, M = 90;
+    for (let j = 0; j <= M; j++) { const v = dom.vmin + (j / M) * (dom.vmax - dom.vmin); for (let i = 0; i <= M; i++) { const u = dom.umin + (i / M) * (dom.umax - dom.umin); const val = L(u, v); if (val < best.L) best = { u, v, L: val }; } }
+    let mu = best.u, mv = best.v;
+    for (let t = 0; t < 80; t++) { const g = grad(mu, mv); mu -= 0.02 * g[0]; mv -= 0.02 * g[1]; }
+    const ex = dom.umax * 0.82, ey = dom.vmax * 0.82;
+    let st = { u: -ex, v: ey, L: -Infinity };
+    for (const c of [[-ex, ey], [ex, ey], [-ex, -ey], [ex, -ey], [0, ey], [ex, 0], [-ex, 0], [0, -ey]]) {
+      const val = L(c[0], c[1]); if (val > st.L) st = { u: c[0], v: c[1], L: val };
+    }
+    return { id: o.id, name: o.name, L, grad, domain: dom, minima: [{ u: mu, v: mv }], start: { u: st.u, v: st.v }, lr0: o.lr0, formula: o.formula, note: o.note, isTerrain: !!o.isTerrain, seed: o.seed, bumps: o.bumps, style: o.style };
+  }
+
+  // 12) Процедурный рельеф. style: mixed (ямы+холмы) | craters (кратеры с валом) | ridges (хребты/каньоны).
+  function makeTerrain(seed, bumps, style) {
+    style = style || "mixed";
     const r = rng((seed >>> 0) || 1);
     const dom = { umin: -3, umax: 3, vmin: -3, vmax: 3 };
     const K = Math.max(3, bumps || 8);
     const comps = [];
     for (let k = 0; k < K; k++) {
       const cx = -2.4 + 4.8 * r(), cy = -2.4 + 4.8 * r();
-      const s = 0.42 + 0.95 * r();
-      const sign = r() < 0.62 ? -1 : 1;            // чаще ямы, чем холмы
-      const a = sign * (0.6 + 1.9 * r());
-      comps.push({ cx, cy, s2: s * s, a });
+      if (style === "craters") {
+        const s1 = 0.30 + 0.45 * r(), A = 0.9 + 1.7 * r();
+        comps.push({ t: "crater", cx, cy, s1: s1 * s1, s2: (2.1 * s1) * (2.1 * s1), A });
+      } else if (style === "ridges") {
+        const ang = r() * Math.PI, sa = 0.24 + 0.30 * r(), sb = 0.9 + 1.2 * r();
+        const sign = r() < 0.72 ? -1 : 1, a = sign * (0.7 + 1.6 * r());
+        comps.push({ t: "ridge", cx, cy, c: Math.cos(ang), s: Math.sin(ang), sa2: sa * sa, sb2: sb * sb, a });
+      } else {
+        const s = 0.42 + 0.95 * r(), sign = r() < 0.62 ? -1 : 1, a = sign * (0.6 + 1.9 * r());
+        comps.push({ t: "gauss", cx, cy, s2: s * s, a });
+      }
     }
-    const b = 0.08;                                 // мягкая глобальная чаша (ограничивает рельеф)
+    const b = style === "craters" ? 0.05 : style === "ridges" ? 0.06 : 0.08;
     const L = (u, v) => {
       let s = 0.5 * b * (u * u + v * v);
-      for (const c of comps) { const dx = u - c.cx, dy = v - c.cy; s += c.a * Math.exp(-(dx * dx + dy * dy) / (2 * c.s2)); }
+      for (const c of comps) {
+        const dx = u - c.cx, dy = v - c.cy, q = dx * dx + dy * dy;
+        if (c.t === "crater") s += -c.A * Math.exp(-q / (2 * c.s1)) + 0.55 * c.A * Math.exp(-q / (2 * c.s2));
+        else if (c.t === "ridge") { const lx = dx * c.c + dy * c.s, ly = -dx * c.s + dy * c.c; s += c.a * Math.exp(-(lx * lx / (2 * c.sa2) + ly * ly / (2 * c.sb2))); }
+        else s += c.a * Math.exp(-q / (2 * c.s2));
+      }
       return s;
     };
     const grad = (u, v) => {
       let gu = b * u, gv = b * v;
-      for (const c of comps) { const dx = u - c.cx, dy = v - c.cy; const e = c.a * Math.exp(-(dx * dx + dy * dy) / (2 * c.s2)); gu += e * (-dx / c.s2); gv += e * (-dy / c.s2); }
+      for (const c of comps) {
+        const dx = u - c.cx, dy = v - c.cy, q = dx * dx + dy * dy;
+        if (c.t === "crater") {
+          const e1 = c.A * Math.exp(-q / (2 * c.s1)), e2 = 0.55 * c.A * Math.exp(-q / (2 * c.s2));
+          gu += e1 * (dx / c.s1) - e2 * (dx / c.s2); gv += e1 * (dy / c.s1) - e2 * (dy / c.s2);
+        } else if (c.t === "ridge") {
+          const lx = dx * c.c + dy * c.s, ly = -dx * c.s + dy * c.c;
+          const e = c.a * Math.exp(-(lx * lx / (2 * c.sa2) + ly * ly / (2 * c.sb2)));
+          const dlx = -lx / c.sa2, dly = -ly / c.sb2;
+          gu += e * (dlx * c.c + dly * (-c.s)); gv += e * (dlx * c.s + dly * c.c);
+        } else {
+          const e = c.a * Math.exp(-q / (2 * c.s2)); gu += e * (-dx / c.s2); gv += e * (-dy / c.s2);
+        }
+      }
       return [gu, gv];
     };
-    // глобальный минимум: грубый поиск по сетке + уточнение градиентным спуском
-    let best = { u: 0, v: 0, L: Infinity }, M = 90;
-    for (let j = 0; j <= M; j++) { const v = dom.vmin + (j / M) * (dom.vmax - dom.vmin); for (let i = 0; i <= M; i++) { const u = dom.umin + (i / M) * (dom.umax - dom.umin); const val = L(u, v); if (val < best.L) best = { u, v, L: val }; } }
-    let mu = best.u, mv = best.v;
-    for (let t = 0; t < 80; t++) { const g = grad(mu, mv); mu -= 0.02 * g[0]; mv -= 0.02 * g[1]; }
-    // старт — из самого «высокого» из углов/краёв, чтобы спуск был зрелищным
-    let st = { u: -2.4, v: 2.4, L: -Infinity };
-    for (const c of [[-2.4, 2.4], [2.4, 2.4], [-2.4, -2.4], [2.4, -2.4], [0, 2.6], [2.6, 0], [-2.6, 0], [0, -2.6]]) {
-      const val = L(c[0], c[1]); if (val > st.L) st = { u: c[0], v: c[1], L: val };
-    }
-    return {
-      id: "terrain", name: "Случайный рельеф", isTerrain: true, seed: seed, bumps: K,
-      L, grad, domain: dom,
-      minima: [{ u: mu, v: mv }],
-      start: { u: st.u, v: st.v }, lr0: 0.06,
-      formula: "L = ½·0.08(x²+y²) + Σ aₖ·e^(−‖p−cₖ‖²/2sₖ²)",
-      note: "Сгенерированный рельеф из случайных ям и холмов. Жми «Новый рельеф» — каждый раз новая карта: ищи, куда сойдётся спуск и поможет ли шум выбраться к глобальному минимуму.",
-    };
+    const styleName = { mixed: "ямы и холмы", craters: "кратеры с валом", ridges: "хребты и каньоны" }[style] || style;
+    return bake({ id: "terrain", name: "Случайный рельеф", isTerrain: true, seed, bumps: K, style, L, grad, domain: dom, lr0: 0.06,
+      formula: "L = ½·b(x²+y²) + Σ компонент · стиль: " + style,
+      note: "Процедурный ландшафт (" + styleName + "). Тыкай готовые рельефы или жми «Сгенерировать новый». Спуск остановится у глобального минимума; шум (SGD) помогает выбраться из локальной ямы." });
   }
 
-  const FUNCS = { bowl, ravine, wavy, rosen, saddle, twowells, himmelblau, rastrigin, styblinski, ackley, terrain: makeTerrain(1, 9), linreg };
+  // 13) «Спираль» — спиральный жёлоб, закрученный к центру (спуск идёт по дуге).
+  function makeSpiral() {
+    const dom = { umin: -3.4, umax: 3.4, vmin: -3.4, vmax: 3.4 };
+    const A = 0.85, k = 1.3, b = 0.16;
+    const L = (u, v) => { const r2 = u * u + v * v; return 0.5 * b * r2 + A * Math.sin(Math.atan2(v, u) - k * Math.sqrt(r2)); };
+    const grad = (u, v) => {
+      const r2 = u * u + v * v, rr = Math.sqrt(r2);
+      if (rr < 1e-3) return [b * u, b * v];
+      const phi = Math.atan2(v, u) - k * rr, cphi = Math.cos(phi);
+      const dphidu = -v / r2 - k * u / rr, dphidv = u / r2 - k * v / rr;
+      return [b * u + A * cphi * dphidu, b * v + A * cphi * dphidv];
+    };
+    return bake({ id: "spiral", name: "Спираль", L, grad, domain: dom, lr0: 0.09,
+      formula: "L = 0.08(x²+y²) + 0.85·sin(θ − 1.3·r),  θ=atan2(y,x)",
+      note: "Спиральный жёлоб закручивается к центру — спуск идёт по дуге, а не по прямой. Особенно красиво в 3D." });
+  }
+
+  // Предрассчитанные «интересные» рельефы разных стилей — их тыкают чипами в UI.
+  const TERRAIN_PRESETS = [
+    { seed: 0x51a7, bumps: 9, style: "mixed" }, { seed: 0x8c12, bumps: 11, style: "mixed" },
+    { seed: 0x2f9b, bumps: 7, style: "craters" }, { seed: 0xb3d4, bumps: 6, style: "craters" },
+    { seed: 0x77e1, bumps: 7, style: "ridges" }, { seed: 0x1a55, bumps: 8, style: "ridges" },
+    { seed: 0xd0c3, bumps: 12, style: "mixed" }, { seed: 0x4e88, bumps: 9, style: "craters" },
+    { seed: 0x33f0, bumps: 8, style: "ridges" }, { seed: 0xa1b2, bumps: 10, style: "mixed" },
+    { seed: 0x6c4e, bumps: 6, style: "craters" }, { seed: 0x9d70, bumps: 9, style: "ridges" },
+  ];
+
+  // В списке функций — только «интересные»: рельеф (по умолчанию первый пресет),
+  // спираль, волнистый овраг и линейная регрессия (реальный батч/SGD по данным).
+  const FUNCS = {
+    terrain: makeTerrain(TERRAIN_PRESETS[0].seed, TERRAIN_PRESETS[0].bumps, TERRAIN_PRESETS[0].style),
+    spiral: makeSpiral(),
+    wavy, linreg,
+  };
   const FUNC_LIST = Object.keys(FUNCS).map((k) => ({ id: k, name: FUNCS[k].name }));
 
   /* --------------------- Степпер ---------------------
@@ -256,6 +314,12 @@
     this.rng = rng(opts.seed || 999);
     this.lastBatch = null;
     this.maxNorm = 1e6; this.tol = 1e-7;
+
+    this.minima = fn.minima || [];
+    const su = fn.domain.umax - fn.domain.umin, sv = fn.domain.vmax - fn.domain.vmin;
+    this.targetEps = 0.04 * Math.hypot(su, sv);  // «окрестность цели» — 4% диагонали домена
+    this.moveTol = 6e-4 * Math.hypot(su, sv);     // «осел» — шаг почти нулевой
+    this.nearTarget = false;
 
     const s = opts.start;
     this.u = s.u; this.v = s.v;
@@ -318,12 +382,20 @@
     const gf = fn.grad(nu, nv);               // полный градиент — для статистики/сходимости
     this.gnorm = Math.hypot(gf[0], gf[1]);
     this.L = fn.L(nu, nv);
-    // сходимость объявляем только в полном батче (SGD честно «дрожит» у минимума)
-    if (this.batchMode === "full" && this.gnorm < this.tol) { this.converged = true; this.done = true; }
+    // останов, как только оказались в окрестности цели (работает и для SGD)
+    if (this._distMin(nu, nv) < this.targetEps) { this.converged = true; this.nearTarget = true; this.done = true; }
+    // либо спуск «осел» (шаг почти нулевой) в локальном минимуме — только для полного батча
+    else if (this.batchMode === "full" && Math.hypot(du, dv) < this.moveTol && this.step > 3) { this.converged = true; this.done = true; }
+  };
+
+  GDStepper.prototype._distMin = function (u, v) {
+    let d = Infinity;
+    for (const m of this.minima) { const dd = Math.hypot(u - m.u, v - m.v); if (dd < d) d = dd; }
+    return d;
   };
 
   GDStepper.prototype.stats = function () {
-    return { step: this.step, L: this.L, gnorm: this.gnorm, done: this.done, diverged: this.diverged, converged: this.converged };
+    return { step: this.step, L: this.L, gnorm: this.gnorm, done: this.done, diverged: this.diverged, converged: this.converged, nearTarget: this.nearTarget };
   };
 
   function startFromSeed(fn, seed) {
@@ -333,5 +405,5 @@
     return { u, v };
   }
 
-  window.GD = { funcs: FUNCS, list: FUNC_LIST, Stepper: GDStepper, rng, gauss, startFromSeed, makeTerrain };
+  window.GD = { funcs: FUNCS, list: FUNC_LIST, Stepper: GDStepper, rng, gauss, startFromSeed, makeTerrain, terrainPresets: TERRAIN_PRESETS };
 })();

@@ -54,7 +54,18 @@
             <circle cx="175" cy="80" r="5" fill="#ef4444"/><circle cx="210" cy="46" r="5" fill="#ef4444"/><circle cx="235" cy="96" r="5" fill="#ef4444"/>
             <circle cx="132" cy="86" r="5" fill="#ef4444" stroke="#14171c" stroke-width="2"/>
             <line x1="150" y1="14" x2="150" y2="120" stroke="#4f46e5" stroke-width="2.5" stroke-dasharray="6 5"/></svg></div>
-          <div class="card-body"><h3>Метрики классификации: болен или здоров? <span class="badge ready">Готово</span></h3><p>Тащишь порог — видишь TP/FP/FN/TN, матрицу ошибок и компромисс Precision / Recall.</p></div>
+          <div class="card-body"><h3>Метрики классификации: болен или здоров? <span class="badge ready">Готово</span></h3><p>Гистограмма людей + порог: матрица ошибок и все метрики — Accuracy, Precision, Recall, F1.</p></div>
+        </a>
+        <a class="card ready" href="viz/rocauc/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M30 118 L250 6" stroke="#cbd5e1" stroke-dasharray="5 5"/>
+            <polygon points="30,118 30,40 70,40 70,20 250,20 250,118" fill="#4f46e5" opacity=".09"/>
+            <path d="M30 118 L30 40" stroke="#0f9d58" stroke-width="3.5"/>
+            <path d="M30 40 L70 40" stroke="#dc2626" stroke-width="3.5"/>
+            <path d="M70 40 L70 20" stroke="#0f9d58" stroke-width="3.5"/>
+            <path d="M70 20 L250 20" stroke="#dc2626" stroke-width="3.5"/>
+            <circle cx="70" cy="20" r="5" fill="#4f46e5"/></svg></div>
+          <div class="card-body"><h3>ROC-кривая и AUC <span class="badge ready">Готово</span></h3><p>Как кривая строится по таблице: больной → шаг вверх, здоровый → шаг вправо. Каждая точка = свой порог, площадь = AUC.</p></div>
         </a>
       </div>
     </section>

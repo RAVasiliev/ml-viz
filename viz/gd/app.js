@@ -20,14 +20,19 @@
   const methTag = $("methTag"), formulaEl = $("formula");
   const batchCtrl = $("batchCtrl"), batchSel = $("batch"), bsCtrl = $("bsCtrl"), bsRange = $("batchSize"), bsVal = $("batchSizeVal");
   const hintEl = $("hint"), legendNote = $("legendNote");
-  const terrainCtrl = $("terrainCtrl"), bumpsRange = $("bumps"), bumpsVal = $("bumpsVal"), newTerrainBtn = $("newTerrain");
+  const terrainCtrl = $("terrainCtrl"), bumpsRange = $("bumps"), bumpsVal = $("bumpsVal"), newTerrainBtn = $("newTerrain"), presetChips = $("presetChips");
 
   let terrainSeed = 1, terrainK = 9;
-  let terrainFn = null;                 // текущий сгенерированный рельеф
-  // вернуть актуальный объект функции (для рельефа — сгенерированный экземпляр)
+  let terrainFn = null;                 // текущий рельеф (пресет или случайный)
+  let terrainIdx = 0;                   // индекс активного пресета (-1 — случайный)
+  const presetCache = {};
+  function getPreset(i) {
+    if (!presetCache[i]) { const p = GD.terrainPresets[i]; presetCache[i] = GD.makeTerrain(p.seed, p.bumps, p.style); }
+    return presetCache[i];
+  }
   function resolveFn() {
     if (funcSel.value === "terrain") {
-      if (!terrainFn) terrainFn = GD.makeTerrain(terrainSeed, terrainK);
+      if (!terrainFn) { terrainFn = getPreset(0); terrainIdx = 0; }
       return terrainFn;
     }
     return GD.funcs[funcSel.value];
@@ -64,7 +69,7 @@
     const o = document.createElement("option");
     o.value = f.id; o.textContent = f.name; funcSel.appendChild(o);
   });
-  funcSel.value = "rosen";
+  funcSel.value = "terrain";
 
   /* ---------- геометрия поля (как в эталоне: квадрат min(W,H)) ---------- */
   function plot() {
@@ -277,7 +282,7 @@
     methTag.className = "meth-tag " +
       (s.diverged ? "diverged" : s.converged ? "converged" : s.step > 0 ? "running" : "idle");
     methTag.textContent = s.diverged ? "расходимость" :
-      s.converged ? "сошёлся" :
+      s.converged ? (s.nearTarget ? "🎯 у цели" : "сошёлся (локальный мин.)") :
       s.step > 0 ? (playing ? "идёт спуск…" : "пауза") : "старт задан";
     stepBtn.disabled = s.done;
   }
@@ -560,15 +565,34 @@
     if (+bsRange.value > maxB) bsRange.value = Math.min(8, maxB);
     bsVal.textContent = bsRange.value;
   }
-  // перегенерировать случайный рельеф и полностью обновить сцену
-  function regenTerrain() {
-    terrainFn = GD.makeTerrain(terrainSeed, terrainK);
+  // применить текущий terrainFn и полностью обновить сцену
+  function applyTerrain() {
     fn = terrainFn;
     start = { u: fn.start.u, v: fn.start.v };
     lrRange.value = lrToSlider(fn.lr0);
     syncFuncUI(); syncLabels();
     buildField(); build3D(); setView(view);
+    highlightChips();
     rebuild();
+  }
+  function loadPreset(i) { terrainFn = getPreset(i); terrainIdx = i; applyTerrain(); }
+  function regenTerrain() {
+    terrainSeed = (terrainSeed * 1664525 + 1013904223) >>> 0;
+    const style = ["mixed", "craters", "ridges"][terrainSeed % 3];   // случайный стиль для разнообразия
+    terrainFn = GD.makeTerrain(terrainSeed, terrainK, style);
+    terrainIdx = -1; applyTerrain();
+  }
+  function buildPresetChips() {
+    presetChips.innerHTML = "";
+    GD.terrainPresets.forEach((p, i) => {
+      const b = document.createElement("button");
+      b.className = "chip" + (i === terrainIdx ? " on" : ""); b.textContent = i + 1; b.dataset.idx = i;
+      b.addEventListener("click", () => loadPreset(i));
+      presetChips.appendChild(b);
+    });
+  }
+  function highlightChips() {
+    presetChips.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", +c.dataset.idx === terrainIdx));
   }
   function setView(v) {
     view = v;
@@ -623,7 +647,7 @@
   document.querySelectorAll(".vtab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
   batchSel.addEventListener("change", () => { updateBatchUI(); rebuild(); });
   bsRange.addEventListener("input", () => { bsVal.textContent = bsRange.value; rebuild(); });
-  newTerrainBtn.addEventListener("click", () => { terrainSeed = (terrainSeed * 1664525 + 1013904223) >>> 0; regenTerrain(); });
+  newTerrainBtn.addEventListener("click", regenTerrain);
   bumpsRange.addEventListener("input", () => { terrainK = +bumpsRange.value; bumpsVal.textContent = terrainK; regenTerrain(); });
 
   // клик по полю (только 2D) — задать стартовую точку
@@ -670,6 +694,7 @@
   start = { u: fn.start.u, v: fn.start.v };
   betaCtrl.style.display = methodSel.value === "momentum" ? "" : "none";
   lrRange.value = lrToSlider(fn.lr0);
+  buildPresetChips();
   updateBatchUI();
   syncFuncUI();
   syncLabels();

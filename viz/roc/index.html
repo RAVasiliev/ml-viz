@@ -3,53 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Болен или здоров? Порог, Precision и Recall — ML-виз</title>
+  <title>Болен или здоров? Порог, Accuracy, Precision, Recall, F1 — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
-    .lead { font-size:15.5px; line-height:1.55; color:var(--muted); max-width:780px; }
+    .lead { font-size:15.5px; line-height:1.55; color:var(--muted); max-width:800px; }
     .lead b { color:var(--ink); }
     .sick { color:#ef4444; } .healthy { color:#10b981; }
     .controls-bar { display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:14px; }
     .ctl { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink); }
     .ctl input[type=range] { width:150px; }
-    .ctl b { font-family:var(--mono); color:var(--accent); min-width:30px; text-align:center; }
+    .ctl b { font-family:var(--mono); color:var(--accent); min-width:46px; text-align:center; }
 
     .stage-card { background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow-sm); padding:16px; margin-top:16px; }
     .thr-readout { display:flex; align-items:center; gap:10px; font-size:14px; margin-bottom:6px; }
     .thr-readout .big { font-family:var(--mono); font-weight:800; font-size:20px; color:var(--accent); }
-    .chart-host { position:relative; width:100%; height:340px; }
+    .chart-host { position:relative; width:100%; height:360px; }
     .chart-host canvas { position:absolute; inset:0; width:100%; height:100%; cursor:ew-resize; }
     .grab-hint { font-size:12.5px; color:var(--faint); margin-top:4px; }
 
-    .row { display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:start; margin-top:18px; }
-    @media (max-width:880px){ .row { grid-template-columns:1fr; } }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; margin-top:18px; }
+    @media (max-width:900px){ .row { grid-template-columns:1fr; } }
 
     /* матрица ошибок */
     .cm-title { font-size:13px; font-weight:650; letter-spacing:.02em; text-transform:uppercase; color:var(--faint); margin-bottom:10px; }
     .cm { display:grid; grid-template-columns:auto 1fr 1fr; gap:8px; }
-    .cm-corner { }
     .cm-colh { text-align:center; font-size:12.5px; font-weight:700; padding-bottom:2px; }
     .cm-colh small, .cm-rowh small { display:block; font-weight:500; color:var(--faint); font-size:11px; }
     .cm-rowh { display:flex; align-items:center; justify-content:flex-end; text-align:right; font-size:12.5px; font-weight:700; padding-right:6px; }
-    .cm-cell { border-radius:11px; padding:12px 10px; text-align:center; border:2px solid transparent; transition:transform .1s; }
-    .cm-cell .ab { font-size:15px; font-weight:800; letter-spacing:.02em; }
-    .cm-cell .lb { font-size:11px; margin:2px 0 5px; }
-    .cm-cell .ct { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
+    .cm-cell { border-radius:11px; padding:11px 10px; text-align:center; border:2px solid transparent; }
+    .cm-cell .ab { font-size:14px; font-weight:800; letter-spacing:.02em; }
+    .cm-cell .lb { font-size:10.5px; margin:2px 0 5px; }
+    .cm-cell .ct { font-size:24px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; }
     .cm-cell.ok { background:#eafaf1; color:#0f9d58; border-color:#bdecd0; }
     .cm-cell.err { background:#fdecec; color:#dc2626; border-color:#f7c9c9; }
 
-    /* precision / recall */
-    .pr-card { background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow-sm); padding:14px 16px; margin-bottom:12px; }
-    .pr-card .ph { display:flex; align-items:baseline; justify-content:space-between; }
-    .pr-card .pn { font-size:16px; font-weight:800; }
-    .pr-card .pv { font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; }
-    .pr-card .pf { font-family:var(--mono); font-size:12.5px; color:var(--muted); margin-top:2px; }
-    .pr-card .pd { font-size:12.5px; color:var(--muted); margin-top:5px; line-height:1.45; }
-    .pr-bar { height:8px; border-radius:100px; background:var(--line); overflow:hidden; margin-top:9px; }
-    .pr-bar > span { display:block; height:100%; width:0; border-radius:100px; transition:width .12s; }
-    .arrow { font-size:13px; font-weight:800; margin-left:6px; }
+    /* метрики 2x2 */
+    .mgrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .mcard { background:var(--surface); border:1px solid var(--line); border-radius:12px; box-shadow:var(--shadow-sm); padding:13px 15px; }
+    .mcard .mh { display:flex; align-items:baseline; justify-content:space-between; }
+    .mcard .mn { font-size:14.5px; font-weight:800; }
+    .mcard .mv { font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .mcard .mf { font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-top:3px; min-height:15px; }
+    .mcard .md { font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.4; }
+    .mbar { height:7px; border-radius:100px; background:var(--line); overflow:hidden; margin-top:8px; }
+    .mbar > span { display:block; height:100%; width:0; border-radius:100px; transition:width .1s; }
+    .arrow { font-size:12px; font-weight:800; margin-left:5px; }
 
     .note-box { background:#f6f5ff; border:1px solid #e2def8; border-radius:12px; padding:14px 16px; margin-top:16px; font-size:14px; line-height:1.55; color:#3730a3; }
     .note-box b { color:#1e1b4b; }
@@ -68,15 +68,15 @@
 
   <main class="lab" style="max-width:1120px">
     <div class="lab-head">
-      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · Порог, Precision, Recall</div>
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · Порог и метрики</div>
       <h1>Болен или здоров?</h1>
-      <p class="lead">Медицинский тест смотрит на каждого человека и выдаёт <b>вероятность, что он болен</b> — число от 0 до 1. Но решение «лечить или нет» — да/нет. Поэтому мы выбираем <b>порог</b>: если вероятность выше порога — говорим <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. <b>Двигай порог</b> и смотри, кого тест поймал, кого пропустил, и как меняются Precision и Recall.</p>
+      <p class="lead">Тест выдаёт каждому человеку <b>вероятность, что он болен</b> (0…1). Решение «лечить?» — да/нет, поэтому выбираем <b>порог</b>: выше — <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. По высоте — <b>сколько людей</b> с такой вероятностью (гистограмма): <b class="healthy">зелёные</b> на самом деле здоровы, <b class="sick">красные</b> больны. <b>Двигай порог</b> — смотри ошибки и метрики.</p>
     </div>
 
     <div class="controls-bar">
       <label class="ctl">Точность теста: <input type="range" id="sep" min="0.05" max="0.42" step="0.01" value="0.24" /><b id="sepVal">ср.</b></label>
-      <label class="ctl">Доля больных: <input type="range" id="bal" min="0.2" max="0.6" step="0.05" value="0.4" /><b id="balVal">40%</b></label>
-      <label class="ctl">Людей: <input type="range" id="count" min="20" max="80" step="2" value="44" /><b id="countVal">44</b></label>
+      <label class="ctl">Доля больных: <input type="range" id="bal" min="0.1" max="0.6" step="0.05" value="0.4" /><b id="balVal">40%</b></label>
+      <label class="ctl">Людей: <input type="range" id="count" min="20" max="5000" step="20" value="500" /><b id="countVal">500</b></label>
       <button class="btn" id="newData" style="flex:none">🎲 Новые люди</button>
     </div>
 
@@ -86,14 +86,14 @@
         <span style="color:var(--faint);font-size:13px">— правее «болен», левее «здоров»</span>
       </div>
       <div class="chart-host"><canvas id="chart"></canvas></div>
-      <div class="grab-hint">🖐 тащи вертикальную линию порога (или кликни по полю). Красные — на самом деле больны, зелёные — здоровы.</div>
+      <div class="grab-hint">🖐 тащи линию порога (или кликни по полю). Тёмная штриховка — ошибки: <b class="sick">FN</b> слева (пропустили больных) и <b class="healthy">FP</b> справа (ложные тревоги).</div>
     </div>
 
     <div class="row">
       <div>
         <div class="cm-title">Матрица ошибок — куда попал каждый человек</div>
         <div class="cm">
-          <div class="cm-corner"></div>
+          <div></div>
           <div class="cm-colh sick">Болен (1)<small>на самом деле</small></div>
           <div class="cm-colh healthy">Здоров (0)<small>на самом деле</small></div>
 
@@ -108,21 +108,40 @@
       </div>
 
       <div>
-        <div class="pr-card">
-          <div class="ph"><span class="pn" style="color:#4f46e5">Recall <span style="font-weight:500;color:var(--faint);font-size:13px">(полнота)</span></span>
-            <span class="pv" style="color:#4f46e5"><span id="rVal">0%</span><span class="arrow" id="rArr"></span></span></div>
-          <div class="pf" id="rFrac">TP / (TP + FN)</div>
-          <div class="pr-bar"><span id="rBar" style="background:#4f46e5"></span></div>
-          <div class="pd">Из <b>всех настоящих больных</b> — скольких тест поймал. Низкий порог → ловим почти всех → Recall растёт.</div>
-        </div>
-        <div class="pr-card">
-          <div class="ph"><span class="pn" style="color:#0ea5e9">Precision <span style="font-weight:500;color:var(--faint);font-size:13px">(точность)</span></span>
-            <span class="pv" style="color:#0ea5e9"><span id="pVal">0%</span><span class="arrow" id="pArr"></span></span></div>
-          <div class="pf" id="pFrac">TP / (TP + FP)</div>
-          <div class="pr-bar"><span id="pBar" style="background:#0ea5e9"></span></div>
-          <div class="pd">Из <b>всех, кого назвали больными</b> — сколько правда больны. Высокий порог → меньше ложных тревог → Precision растёт.</div>
+        <div class="cm-title">Метрики качества</div>
+        <div class="mgrid">
+          <div class="mcard">
+            <div class="mh"><span class="mn" style="color:#475569">Accuracy</span><span class="mv" style="color:#475569"><span id="aVal">0%</span><span class="arrow" id="aArr"></span></span></div>
+            <div class="mf" id="aFrac"></div>
+            <div class="mbar"><span id="aBar" style="background:#475569"></span></div>
+            <div class="md">доля верных ответов из <b>всех</b>. Обманчива при перекосе классов.</div>
+          </div>
+          <div class="mcard">
+            <div class="mh"><span class="mn" style="color:#8b5cf6">F1</span><span class="mv" style="color:#8b5cf6"><span id="fVal">0%</span><span class="arrow" id="fArr"></span></span></div>
+            <div class="mf" id="fFrac"></div>
+            <div class="mbar"><span id="fBar" style="background:#8b5cf6"></span></div>
+            <div class="md">баланс Precision и Recall (их <b>гармоническое среднее</b>).</div>
+          </div>
+          <div class="mcard">
+            <div class="mh"><span class="mn" style="color:#4f46e5">Recall</span><span class="mv" style="color:#4f46e5"><span id="rVal">0%</span><span class="arrow" id="rArr"></span></span></div>
+            <div class="mf" id="rFrac"></div>
+            <div class="mbar"><span id="rBar" style="background:#4f46e5"></span></div>
+            <div class="md">из <b>всех больных</b> — скольких поймали. Низкий порог → ↑.</div>
+          </div>
+          <div class="mcard">
+            <div class="mh"><span class="mn" style="color:#0ea5e9">Precision</span><span class="mv" style="color:#0ea5e9"><span id="pVal">0%</span><span class="arrow" id="pArr"></span></span></div>
+            <div class="mf" id="pFrac"></div>
+            <div class="mbar"><span id="pBar" style="background:#0ea5e9"></span></div>
+            <div class="md">из <b>названных больными</b> — сколько правда больны. Высокий порог → ↑.</div>
+          </div>
         </div>
       </div>
+    </div>
+
+    <div class="cm-title" style="margin-top:24px">Все метрики в зависимости от порога</div>
+    <div class="stage-card" style="margin-top:0">
+      <div class="chart-host" style="height:300px"><canvas id="chart2"></canvas></div>
+      <div class="grab-hint">синяя линия — текущий порог (тащи её здесь или на гистограмме выше). Точки — значения метрик при этом пороге. Видно: при росте порога Recall падает, Precision растёт, а Accuracy и F1 имеют максимум.</div>
     </div>
 
     <div class="note-box" id="note"></div>

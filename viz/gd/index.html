@@ -41,6 +41,12 @@
     }
     .vtab:hover { border-color: var(--line-strong); color: var(--ink); }
     .vtab.active { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    /* чипы готовых рельефов */
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { width: 34px; height: 34px; border: 1px solid var(--line-strong); background: var(--surface);
+      border-radius: 9px; font: inherit; font-weight: 650; font-size: 13px; color: var(--muted); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
+    .chip:hover { border-color: var(--faint); }
+    .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -104,12 +110,14 @@
         </div>
 
         <div class="control" id="terrainCtrl" style="display:none">
-          <label for="bumps">Сложность рельефа <span class="val" id="bumpsVal">9</span></label>
-          <input type="range" id="bumps" min="3" max="16" step="1" value="9" />
+          <label>Готовые рельефы — тыкай</label>
+          <div class="chip-row" id="presetChips"></div>
           <div class="btn-row" style="padding-top:10px">
-            <button class="btn wide" id="newTerrain">🎲 Новый рельеф</button>
+            <button class="btn wide" id="newTerrain">🎲 Сгенерировать новый</button>
           </div>
-          <div class="hint">Случайные ямы и холмы. Каждый рельеф уникален — ищи глобальный минимум.</div>
+          <label for="bumps" style="margin-top:12px">Сложность нового <span class="val" id="bumpsVal">9</span></label>
+          <input type="range" id="bumps" min="3" max="16" step="1" value="9" />
+          <div class="hint">Тыкай готовые ландшафты или сгенерируй случайный. Ищи глобальный минимум — и смотри, помогает ли шум (SGD) выбраться из ямы.</div>
         </div>
 
         <div class="control">

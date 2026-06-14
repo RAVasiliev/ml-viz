@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ROC-кривая и AUC — как строится по таблице — ML-виз</title>
+  <link rel="stylesheet" href="../../assets/css/main.css" />
+  <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    .lead { font-size:15px; line-height:1.55; color:var(--muted); max-width:840px; }
+    .lead b { color:var(--ink); }
+    .sick { color:#ef4444; } .healthy { color:#10b981; }
+
+    /* теор-справка */
+    .theory { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0 6px; }
+    @media (max-width:820px){ .theory { grid-template-columns:1fr; } }
+    .tcard { background:var(--surface); border:1px solid var(--line); border-radius:13px; box-shadow:var(--shadow-sm); padding:14px 17px; }
+    .tcard h3 { margin:0 0 7px; font-size:15px; font-weight:750; letter-spacing:-.01em; }
+    .tcard p { margin:0 0 7px; font-size:13.5px; line-height:1.55; color:var(--muted); }
+    .tcard p:last-child { margin-bottom:0; }
+    .tcard b { color:var(--ink); }
+    .formula { font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--line);
+      border-radius:7px; padding:2px 7px; display:inline-block; margin:1px 0; }
+    .auc-scale-line { display:flex; gap:0; margin-top:8px; border-radius:6px; overflow:hidden; font-size:11px; font-weight:700; text-align:center; }
+    .auc-scale-line div { padding:4px 2px; color:#fff; }
+
+    .controls-bar { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin:16px 0 4px; }
+    .ctl { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink); }
+    .ctl input[type=range] { width:140px; }
+    .ctl b { font-family:var(--mono); color:var(--accent); min-width:34px; text-align:center; }
+
+    .grid2 { display:grid; grid-template-columns:380px 1fr; gap:22px; align-items:start; margin-top:14px; }
+    @media (max-width:920px){ .grid2 { grid-template-columns:1fr; } }
+    .panel-title { font-size:13px; font-weight:650; letter-spacing:.02em; text-transform:uppercase; color:var(--faint); margin-bottom:10px; }
+    .cut-info { font-size:12.5px; color:var(--muted); margin-bottom:8px; }
+    .cut-info b { color:var(--ink); font-family:var(--mono); }
+
+    /* таблица данных — прокручиваемая, липкая шапка */
+    .table-wrap { max-height:560px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
+    table.dt { border-collapse:collapse; font-size:13px; width:100%; }
+    table.dt th, table.dt td { padding:6px 10px; border-bottom:1px solid var(--line); text-align:center; font-variant-numeric:tabular-nums; }
+    table.dt thead th { position:sticky; top:0; background:var(--surface); z-index:1; font-size:11px; color:var(--faint); font-weight:650; box-shadow:0 1px 0 var(--line); }
+    table.dt td.s { font-family:var(--mono); font-weight:650; }
+    table.dt tr.body { cursor:pointer; }
+    table.dt tr.body:hover { background:var(--accent-soft); }
+    table.dt tr.pos td { background:rgba(79,70,229,.07); }
+    table.dt tr.pos:hover td { background:var(--accent-soft); }
+    table.dt tr.cur td { box-shadow:inset 0 -2px 0 var(--accent); }
+    table.dt tr.hl td { background:#fff7d6 !important; }
+    .badge-c { display:inline-block; padding:1px 8px; border-radius:100px; font-size:11.5px; font-weight:700; }
+    .b-sick { background:#fdecec; color:#dc2626; } .b-heal { background:#eafaf1; color:#0f9d58; }
+    .step-up { color:#0f9d58; font-weight:800; } .step-right { color:#dc2626; font-weight:800; }
+    .pred { font-size:11.5px; font-weight:700; }
+
+    .chart-host { position:relative; width:100%; max-width:440px; aspect-ratio:1/1; margin:0 auto;
+      border-radius:12px; border:1px solid var(--line); background:var(--surface-2); }
+    .chart-host canvas { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; }
+
+    /* AUC баннер + сетка чипов (аккуратно, без съезжания) */
+    .auc-banner { display:flex; align-items:center; justify-content:space-between; gap:12px;
+      background:linear-gradient(135deg,#eef0fe,#e0f2fe); border:1px solid #c7d2fe; border-radius:12px; padding:11px 16px; margin-top:14px; }
+    .auc-banner .lbl { font-size:12px; color:#4338ca; font-weight:600; }
+    .auc-banner .v { font-size:30px; font-weight:800; color:var(--accent); font-variant-numeric:tabular-nums; line-height:1; }
+    .auc-banner .sc { font-size:11.5px; color:#6366f1; text-align:right; }
+    .statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+    .statgrid .chip { background:var(--surface); border:1px solid var(--line); border-radius:9px; padding:8px 10px; }
+    .statgrid .chip .k { font-size:11px; color:var(--faint); font-weight:600; }
+    .statgrid .chip b { display:block; font-size:16px; font-variant-numeric:tabular-nums; color:var(--c, var(--ink)); margin-top:2px; }
+
+    .note-box { background:#f6f5ff; border:1px solid #e2def8; border-radius:12px; padding:14px 16px; margin-top:16px; font-size:14px; line-height:1.55; color:#3730a3; }
+    .note-box b { color:#1e1b4b; }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="../../index.html">
+        <span class="logo"><svg width="16" height="16" viewBox="0 0 16 16"><circle cx="5" cy="6" r="2" fill="#fff"/><circle cx="11" cy="5" r="2" fill="#fff" opacity=".8"/><circle cx="8" cy="11" r="2" fill="#fff" opacity=".6"/></svg></span>
+        ML-виз
+      </a>
+      <nav><a href="../../index.html">← Все визуализации</a></nav>
+    </div>
+  </header>
+
+  <main class="lab" style="max-width:1140px">
+    <div class="lab-head">
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · ROC и AUC</div>
+      <h1>ROC-кривая и AUC</h1>
+      <p class="lead">Сортируем людей по <b>скору</b> теста (сверху — кого тест сильнее подозревает). Опускаем порог сверху вниз и по очереди объявляем «болен». Каждый новый человек двигает точку на кривой: <b class="sick">больной → шаг вверх</b> (поймали, ↑ Recall), <b class="healthy">здоровый → шаг вправо</b> (ложная тревога, ↑ FPR). Площадь под лесенкой — это <b>AUC</b>.</p>
+    </div>
+
+    <!-- Теор-справка -->
+    <div class="theory">
+      <div class="tcard">
+        <h3>ROC = Receiver Operating Characteristic</h3>
+        <p>Кривая показывает работу классификатора <b>сразу при всех порогах</b>. Каждая точка — это один порог. По осям:</p>
+        <p><span class="formula">TPR = Recall = TP / (TP + FN)</span> — <b>ось Y</b>: доля пойманных больных (чувствительность).</p>
+        <p><span class="formula">FPR = FP / (FP + TN) = 1 − Specificity</span> — <b>ось X</b>: доля ложных тревог среди здоровых.</p>
+        <p>Порог едет от 1 к 0: старт в <b>(0, 0)</b> (никого не лечим), финиш в <b>(1, 1)</b> (лечим всех). Чем сильнее кривая прижата к <b>левому-верхнему углу</b> — тем лучше.</p>
+      </div>
+      <div class="tcard">
+        <h3>AUC = Area Under Curve ∈ [0, 1]</h3>
+        <p>Площадь под ROC. Равна <b>вероятности, что случайный больной получит скор выше случайного здорового</b> — то есть насколько хорошо тест <b>ранжирует</b> людей.</p>
+        <p>Не зависит от выбора одного порога — оценивает качество в целом.</p>
+        <div class="auc-scale-line">
+          <div style="background:#ef4444;flex:5">0.5 — наугад</div>
+          <div style="background:#f59e0b;flex:2">0.7</div>
+          <div style="background:#84cc16;flex:2">0.9</div>
+          <div style="background:#10b981;flex:1">1.0</div>
+        </div>
+        <p style="margin-top:7px;font-size:12px">0.5 — как монетка (диагональ) · &gt;0.9 — отличный тест · 1.0 — идеальное разделение · &lt;0.5 — хуже монетки.</p>
+      </div>
+    </div>
+
+    <div class="controls-bar">
+      <label class="ctl">Людей: <input type="range" id="count" min="6" max="400" step="1" value="12" /><b id="countVal">12</b></label>
+      <label class="ctl">Качество теста: <input type="range" id="sep" min="0.0" max="0.4" step="0.02" value="0.22" /><b id="sepVal">ср.</b></label>
+      <button class="btn" id="newData" style="flex:none">🎲 Новые данные</button>
+      <button class="btn primary" id="build" style="flex:none">▶ Построить по шагам</button>
+      <span style="font-size:12.5px;color:var(--faint)">больше людей → глаже кривая. Наводи на строку или точку.</span>
+    </div>
+
+    <div class="grid2">
+      <div>
+        <div class="panel-title">Таблица — отсортирована по скору ↓</div>
+        <div class="cut-info" id="cutInfo"></div>
+        <div class="table-wrap">
+          <table class="dt">
+            <thead><tr>
+              <th>#</th><th>скор</th><th>факт</th><th>шаг</th><th>прогноз<br>при пороге</th>
+            </tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel-title">ROC-кривая (лесенка)</div>
+        <div class="chart-host"><canvas id="roc"></canvas></div>
+        <div class="auc-banner">
+          <div><div class="lbl">AUC — площадь под кривой</div><div class="v" id="aucVal">—</div></div>
+          <div class="sc">0.5 наугад<br>1.0 идеал</div>
+        </div>
+        <div class="statgrid">
+          <div class="chip" style="--c:#4f46e5"><span class="k">Recall = TPR</span><b id="tprVal">—</b></div>
+          <div class="chip" style="--c:#ef4444"><span class="k">FPR</span><b id="fprVal">—</b></div>
+          <div class="chip" style="--c:#475569"><span class="k">порог τ</span><b id="tauVal">—</b></div>
+          <div class="chip" style="--c:#0f9d58"><span class="k">TP · TN</span><b><span id="tpVal">0</span> · <span id="tnVal">0</span></b></div>
+          <div class="chip" style="--c:#dc2626"><span class="k">FP · FN</span><b><span id="fpVal">0</span> · <span id="fnVal">0</span></b></div>
+          <div class="chip" style="--c:#475569"><span class="k">точка #</span><b id="kVal">0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-box" id="note"></div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
