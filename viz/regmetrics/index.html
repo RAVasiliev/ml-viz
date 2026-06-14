@@ -137,11 +137,11 @@
     <div class="verdict" id="verdict" style="margin-top:14px"></div>
 
     <div class="section-title">Функции потерь L(e): почему MSE наказывает сильнее</div>
-    <p class="hint-inline" style="margin:0 0 8px;font-size:13px">Наведи на график в любом месте: для любой ошибки <i>e</i> видно её штраф <b style="color:#10b981">|e|</b> (его усредняет MAE) и <b style="color:#4f46e5">e²</b> (его усредняет MSE). Три пунктира — итоговые по всем квартирам <b style="color:#10b981">MAE</b>, <b style="color:#4f46e5">MSE</b> и <b style="color:#8b5cf6">RMSE = √MSE</b>.</p>
+    <p class="hint-inline" style="margin:0 0 8px;font-size:13px">Наведи на график в любом месте — для любой ошибки <i>e</i> увидишь её штраф <b style="color:#10b981">|e|</b> и <b style="color:#4f46e5">e²</b>. Три пунктира — итоговые метрики: вертикали <b style="color:#10b981">MAE</b> и <b style="color:#8b5cf6">RMSE</b> (типичная ошибка, млн ₽) и горизонталь <b style="color:#4f46e5">MSE</b> (средний квадрат). Где горизонталь <b style="color:#4f46e5">MSE</b> пересекает параболу — там и вертикаль <b style="color:#8b5cf6">RMSE = √MSE</b>.</p>
     <div class="curve-host"><canvas id="curves"></canvas></div>
   </main>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
   <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null});}catch(err){}});</script>
 </body>
 </html>
