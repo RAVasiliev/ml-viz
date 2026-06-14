@@ -47,7 +47,7 @@
     return { sx: x1, sy: y1 * se - z * HS * ce, depth: y1 * ce + z * HS * se };
   }
 
-  function render(ctx, grid, fn, gd, cam, W, H) {
+  function render(ctx, grid, fn, tracks, cam, W, H) {
     const N = grid.N, L = grid.L, hd = grid.hd, d = grid.domain;
     const S = 0.40 * Math.min(W, H);
     const cx = W / 2, cyc = H * 0.56;
@@ -92,23 +92,21 @@
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.6; ctx.stroke();
     }
 
-    // траектория
-    if (gd && gd.path.length) {
-      ctx.strokeStyle = "rgba(239,68,68,.95)"; ctx.lineWidth = 2.4; ctx.lineJoin = "round"; ctx.beginPath();
-      for (let i = 0; i < gd.path.length; i++) {
-        const pt = gd.path[i]; const s = scr(xnu(pt.u), xnv(pt.v), liftL(pt.u, pt.v));
+    // траектории (одна или много — мультиспуск)
+    const trs = tracks || [];
+    const many = trs.length > 1;
+    for (const tr of trs) {
+      const path = tr.path; if (!path || !path.length) continue;
+      const col = tr.color || "#ef4444";
+      ctx.strokeStyle = col; ctx.lineWidth = many ? 1.5 : 2.4; ctx.lineJoin = "round"; ctx.globalAlpha = many ? 0.8 : 1; ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const pt = path[i]; const s = scr(xnu(pt.u), xnv(pt.v), liftL(pt.u, pt.v));
         if (i === 0) ctx.moveTo(s.X, s.Y); else ctx.lineTo(s.X, s.Y);
       }
-      ctx.stroke();
-      // старт
-      const p0 = gd.path[0], s0 = scr(xnu(p0.u), xnv(p0.v), liftL(p0.u, p0.v));
-      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(s0.X, s0.Y, 3.6, 0, 7); ctx.fill();
-      ctx.strokeStyle = "#ef4444"; ctx.lineWidth = 2; ctx.stroke();
-      // текущая
-      const pl = gd.path[gd.path.length - 1], sl = scr(xnu(pl.u), xnv(pl.v), liftL(pl.u, pl.v));
-      ctx.fillStyle = "rgba(239,68,68,.2)"; ctx.beginPath(); ctx.arc(sl.X, sl.Y, 9, 0, 7); ctx.fill();
-      ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(sl.X, sl.Y, 5, 0, 7); ctx.fill();
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.stroke(); ctx.globalAlpha = 1;
+      const pl = path[path.length - 1], sl = scr(xnu(pl.u), xnv(pl.v), liftL(pl.u, pl.v));
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sl.X, sl.Y, many ? 3.2 : 5, 0, 7); ctx.fill();
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = many ? 1.2 : 2; ctx.stroke();
     }
   }
 

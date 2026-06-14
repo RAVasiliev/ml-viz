@@ -6,7 +6,31 @@
   <title>Дерево решений — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    .lead { font-size:15.5px; line-height:1.55; color:var(--muted); max-width:760px; }
+    .lead b { color:var(--ink); }
+    .teach { max-width:760px; margin:16px 0 4px; display:grid; gap:14px; }
+    .teach-card { background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+      box-shadow:var(--shadow-sm); padding:14px 16px 12px; }
+    .teach-card h3 { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+      color:var(--faint); margin:0 0 9px; }
+    .teach-card p { margin:0 0 8px; font-size:14px; line-height:1.55; color:var(--muted); }
+    .teach-card p:last-child { margin-bottom:0; }
+    .teach-card b { color:var(--ink); }
+    .kf { margin:8px 0; overflow-x:auto; overflow-y:hidden; }
+    .kf[data-block] { padding:2px 0; }
+    .katex { font-size:1.05em; }
+    .gloss { font-size:12.5px; line-height:1.5; color:var(--muted); margin:2px 0 12px; }
+    .gloss:last-child { margin-bottom:0; }
+    .gloss b { color:var(--ink); }
+    .intuition { list-style:none; margin:0; padding:0; display:grid; gap:9px; }
+    .intuition li { position:relative; padding-left:22px; font-size:14px; line-height:1.5; color:var(--muted); }
+    .intuition li::before { content:"→"; position:absolute; left:0; top:0; color:var(--accent); font-weight:700; }
+    .intuition li b { color:var(--ink); }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -23,7 +47,35 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Деревья · Дерево решений</div>
       <h1>Дерево решений (CART)</h1>
-      <p>Дерево рекурсивно режет плоскость <b>осевыми разбиениями</b>: на каждом шаге выбирается признак и порог, максимизирующие падение <b>неопределённости</b> (критерий Джини или энтропия). Регионы листьев красятся в предсказанный класс. Следи за <b>train-accuracy</b>: с ростом глубины она ползёт к 100% — это и есть переобучение.</p>
+      <p class="lead">Представь игру <b>«Угадай кто»</b>: перед тобой толпа фигурок, и ты задаёшь вопросы <b>«если рост выше 1.70&nbsp;м — то…»</b>, <b>«если очки — то…»</b>, отсекая половину за раз. Дерево решений делает ровно это с данными: на каждом шаге оно выбирает <b>один вопрос про один признак</b> («координата&nbsp;<i>x</i> меньше порога&nbsp;<i>t</i>?»), который сильнее всего наводит порядок — <b>уменьшает «беспорядок»</b> (неопределённость) внутри группы. Так плоскость рекурсивно режется на прямоугольные <b>регионы-листья</b>, каждый красится в свой класс. Гляди на <b>train-accuracy</b>: с глубиной она ползёт к&nbsp;100&nbsp;%, но граница дробится на лоскутки — это и есть <b>переобучение</b>.</p>
+
+      <div class="teach">
+        <div class="teach-card">
+          <h3>Чем мерим «беспорядок» в группе</h3>
+          <p>«Беспорядок» региона&nbsp;<i>R</i> — это насколько в нём перемешаны классы. Если все точки одного класса — порядок идеальный, мера&nbsp;0. Если классы пополам — максимальный хаос. Два способа посчитать (доля класса&nbsp;<i>k</i> в регионе — <i>p̂<sub>k</sub></i>):</p>
+          <div class="kf" data-tex="H_{\text{Gini}}(R)=\sum_k \hat p_k(1-\hat p_k)" data-block></div>
+          <p class="gloss"><b>Джини.</b> Вытащим из региона две случайные точки — какова вероятность, что они <b>разных</b> классов. Чисто (один класс) → 0; смесь → больше.</p>
+          <div class="kf" data-tex="H(R)=-\sum_k \hat p_k\log_2 \hat p_k" data-block></div>
+          <p class="gloss"><b>Энтропия.</b> Сколько вопросов «да/нет» в среднем нужно, чтобы угадать класс случайной точки. Для двух классов: при <i>p̂</i>&nbsp;≈&nbsp;0.5 ровно <b>1 бит</b> (полный туман), при <i>p̂</i>&nbsp;≈&nbsp;0 или&nbsp;1 — почти&nbsp;0.</p>
+        </div>
+
+        <div class="teach-card">
+          <h3>Какой вопрос выбрать на шаге</h3>
+          <p>Перебираем все признаки и пороги&nbsp;<i>t</i>. Хороший вопрос делит регион&nbsp;<i>R</i> на левый&nbsp;<i>R<sub>ℓ</sub></i> и правый&nbsp;<i>R<sub>r</sub></i> так, чтобы <b>взвешенный</b> беспорядок детей упал как можно сильнее. Этот выигрыш — <b>прирост информации</b>:</p>
+          <div class="kf" data-tex="Q=H(R)-\frac{|R_\ell|}{|R|}H(R_\ell)-\frac{|R_r|}{|R|}H(R_r)" data-block></div>
+          <p class="gloss">Беспорядок <b>до</b> минус беспорядок <b>после</b> (доли&nbsp;<i>|R<sub>ℓ</sub>|/|R|</i> и&nbsp;<i>|R<sub>r</sub>|/|R|</i> — веса по размеру групп). Дерево <b>жадно</b> ставит тот вопрос, у которого <i>Q</i> максимален — это и есть линия реза, которую ты видишь на каждом «Шаге&nbsp;⏭».</p>
+        </div>
+
+        <div class="teach-card">
+          <h3>Что видно и что покрутить</h3>
+          <ul class="intuition">
+            <li>Жми <b>«Шаг&nbsp;⏭»</b> — на плоскости появляется один <b>осевой рез</b>, а в нижней диаграмме растёт узел. Каждый рез — тот самый вопрос с наибольшим&nbsp;<i>Q</i>.</li>
+            <li>Тяни <b>Макс.&nbsp;глубину</b> вверх — граница из пары линий дробится на лоскутки, <b>train-accuracy</b> лезет к&nbsp;100&nbsp;%, а обведённых точек-ошибок почти не остаётся: классическое <b>переобучение</b>.</li>
+            <li>Подними <b>Мин. объектов в листе</b> — мелкие «островки» под единичные точки исчезают: лист обязан содержать минимум объектов, граница становится спокойнее (регуляризация).</li>
+            <li>Переключи <b>Критерий</b> Джини&nbsp;↔&nbsp;Энтропия — разрезы почти те же: обе меры гладкие и чувствительнее, чем доля ошибок, но «договариваются» об одном и том же порядке вопросов.</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="lab-grid">
@@ -101,5 +153,6 @@
   <script src="../../assets/js/tree-core.js"></script>
   <script src="dtree.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

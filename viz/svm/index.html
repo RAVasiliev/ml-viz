@@ -6,6 +6,8 @@
   <title>Метод опорных векторов (SVM) — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
     /* Бейдж текущего ядра — специфичен для SVM, поэтому инлайном. */
@@ -13,6 +15,32 @@
       display: inline-block; font-size: 12px; font-weight: 600;
       padding: 4px 12px; border-radius: 100px; letter-spacing: .01em;
       background: #eef0fe; color: #4f46e5;
+    }
+    /* Учебные блоки: формулы (KaTeX) + интуиция. Специфичны для карточки. */
+    .kf { margin: 8px 0; }
+    .katex { font-size: 1.05em; }
+    .teach { display: grid; grid-template-columns: 1.15fr 1fr; gap: 18px; margin: 4px 0 20px; align-items: start; }
+    @media (max-width: 760px) { .teach { grid-template-columns: 1fr; } }
+    .teach-card {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 14px; padding: 16px 18px;
+    }
+    .teach-card h2 {
+      font-size: 13px; font-weight: 650; letter-spacing: .02em; text-transform: uppercase;
+      color: var(--faint); margin: 0 0 12px;
+    }
+    .formula-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .formula-row:last-child { border-bottom: none; }
+    .formula-row .gloss { font-size: 13px; line-height: 1.5; color: var(--muted); margin-top: 4px; }
+    .formula-row .gloss b { color: var(--ink); }
+    .teach-card ul { margin: 0; padding-left: 18px; }
+    .teach-card li { font-size: 13.5px; line-height: 1.55; color: var(--muted); margin-bottom: 9px; }
+    .teach-card li:last-child { margin-bottom: 0; }
+    .teach-card li b { color: var(--ink); }
+    .teach-card li code {
+      font-family: var(--mono); font-size: .92em;
+      background: var(--accent-soft); color: var(--accent);
+      padding: 1px 6px; border-radius: 6px;
     }
   </style>
 </head>
@@ -31,7 +59,35 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Линейные · Метод опорных векторов</div>
       <h1>Метод опорных векторов (SVM)</h1>
-      <p>SVM ищет разделяющую гиперплоскость с <b>максимальным отступом</b>. Решающая функция <b>f(x) = Σ αᵢyᵢK(xᵢ,x)</b> построена на обучающих точках; обводятся <b>опорные векторы</b> — те, что нарушают отступ <b>y·f(x) &lt; 1</b> и держат границу, как колонны крышу. Сплошная линия — граница <b>f=0</b>, пунктир — полоса <b>f=±1</b>. Параметр <b>C</b> — мягкий отступ (баланс ширины и ошибок). С <b>ядерным трюком</b> (RBF) граница становится нелинейной: <i>linear</i> не разделит кольца, а <i>RBF</i> — да. Обучение — Pegasos (стохастический субградиент Hinge Loss).</p>
+      <p>Представь, что банк сортирует платежи: слева — честные, справа — <b>фрод</b>. Провести границу мало: если она впритык к ближайшему мошеннику, то завтра чуть-чуть другой платёж — и мы промахнулись. SVM проводит границу <b>с запасом</b> — оставляет вокруг неё <b>широкую нейтральную полосу</b>, чтобы оба класса были как можно дальше от черты. Опирается он при этом не на всю толпу, а на самые спорные, пограничные платежи у края полосы — это <b>опорные векторы</b>. Они держат границу, как колонны крышу: убери платёж из глубины своего лагеря — граница не дрогнет; сдвинь опорный — она поедет следом. Параметр <b>C</b> решает, чем жертвовать: широкой полосой или редкими нарушителями внутри неё. А <b>ядерный трюк</b> (RBF) умеет искривлять полосу — прямая не отделит кольцо фрода внутри честных платежей, а изогнутая граница отделит. Обучение здесь — Pegasos, пошаговый спуск по Hinge-лоссу.</p>
+    </div>
+
+    <div class="teach">
+      <div class="teach-card">
+        <h2>Что под капотом</h2>
+        <div class="formula-row">
+          <div class="kf" data-tex="M_i = y_i\,(\langle w,x_i\rangle+b)" data-block></div>
+          <div class="gloss"><b>Отступ</b> платежа: насколько уверенно и в какую сторону он лежит от границы. <b>M ≈ +большое</b> — глубоко в своём лагере; <b>M &lt; 0</b> — попал не туда (ошибка); <b>M ≈ 0</b> — спорный, у самой черты.</div>
+        </div>
+        <div class="formula-row">
+          <div class="kf" data-tex="\text{ширина полосы} = \dfrac{2}{\lVert w\rVert}" data-block></div>
+          <div class="gloss">Сама <b>нейтральная полоса</b>, тот самый запас. Чем меньше норма весов <b>‖w‖</b>, тем шире полоса — поэтому SVM минимизирует ½‖w‖² (то есть <i>максимизирует</i> запас). Это число — в плашке «ширина отступа 2/‖w‖».</div>
+        </div>
+        <div class="formula-row">
+          <div class="kf" data-tex="\mathcal{L}=\frac1n\sum_i \max(0,\,1-y_i f(x_i))" data-block></div>
+          <div class="gloss"><b>Hinge-лосс</b> — счёт за нарушения. Платёж за полосой (M ≥ 1) платит <b>0</b>; чуть зашёл в полосу или ошибся — платит тем больше, чем глубже. SVM ищет баланс: широкая полоса <b>минус</b> штраф за тех, кто в неё залез, с весом <b>C</b>.</div>
+        </div>
+      </div>
+
+      <div class="teach-card">
+        <h2>Что покрутить и куда смотреть</h2>
+        <ul>
+          <li><b>Обведённые точки — опорные векторы</b> (те, у кого <code>y·f(x) &lt; 1</code>, то есть отступ <b>M &lt; 1</b>). Только они держат границу. Точки в глубине лагеря на неё уже не влияют.</li>
+          <li>Двинь <b>C влево</b> (мягче) — полоса <code>2/‖w‖</code> расширяется, внутрь пускается больше спорных точек (slack <b>ξᵢ</b>), опорных становится больше. <b>C вправо</b> — полоса сужается, граница жёстче льнёт к данным.</li>
+          <li>Переключи ядро на <b>linear</b> на «Кольцах» — прямая честно не справится. Верни <b>RBF</b> и крути <b>γ</b>: больше γ — граница изгибается сильнее и липнет к точкам (риск переобучения).</li>
+          <li>Жми <b>Эпоха ⏭</b> и следи за плашками: <code>train-accuracy</code> растёт, <code>ширина отступа 2/‖w‖</code> устаканивается — модель нашла свой компромисс между запасом и ошибками.</li>
+        </ul>
+      </div>
     </div>
 
     <div class="lab-grid">
@@ -106,5 +162,6 @@
   <script src="../../assets/js/datasets-labeled.js"></script>
   <script src="svm.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

@@ -101,13 +101,6 @@
     .kmae { color:#10b981 !important; } .kmse { color:#4f46e5 !important; }
     .kres { font-weight:bold; }
     .kres.kmae { color:#10b981 !important; } .kres.kmse { color:#4f46e5 !important; } .kres.krmse { color:#8b5cf6 !important; }
-    .mhead { display:flex; align-items:baseline; gap:10px; }
-    .mq { font-size:12.5px; color:var(--faint); font-weight:500; }
-    .mnote { font-size:12.5px; color:var(--muted); margin:2px 0 6px; }
-    .mtemplate { display:grid; gap:4px; font-size:13px; line-height:1.5; color:var(--muted); margin-top:4px;
-      border-top:1px solid var(--line); padding-top:9px; }
-    .mtemplate .tag { display:inline-block; min-width:158px; color:var(--ink); font-weight:600; }
-    @media (max-width:560px){ .mtemplate .tag { min-width:0; display:block; } }
   </style>
 </head>
 <body>
@@ -161,8 +154,6 @@
     <div class="section-title">Функции потерь L(e): почему MSE наказывает сильнее</div>
     <div class="curve-host"><canvas id="curves"></canvas></div>
     <p class="hint-inline" style="display:block;margin-top:8px">Привычные кривые потерь от ошибки <i>e</i> = <i>y</i> − <i>ŷ</i>: <b style="color:#10b981">L(e) = |e|</b> (даёт MAE) — «галочка», и <b style="color:#4f46e5">L(e) = e²</b> (даёт MSE) — парабола. Каждый арбуз — точка на обеих кривых при своей ошибке. Видно: при крупной ошибке парабола взлетает несоизмеримо выше прямой — поэтому MSE так чувствительна к выбросам. Наведи или кликни на арбуз — подсветится здесь и в таблице.</p>
-
-    <p style="margin-top:20px;font-size:12.5px;color:var(--faint)">Новая версия по эталону объяснения. <a href="../regmetrics-legacy/index.html" style="color:var(--muted);text-decoration:underline;text-underline-offset:2px">Открыть прежнюю версию (легаси)</a>.</p>
   </main>
 
   <script src="app.js"></script>

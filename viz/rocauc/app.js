@@ -50,7 +50,7 @@
     P = arr.filter((d) => d.sick).length; Nn = arr.length - P;
     computePoints();
     state.pinned = Math.round(arr.length / 2);
-    state.hover = -1;
+    state.hover = -1; resetView();
     if (state.timer) { clearInterval(state.timer); state.timer = 0; }
   }
   function computePoints() {
@@ -104,25 +104,39 @@
     W = r.width; H = r.height; canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawROC();
   }
+  const view = { x0: 0, x1: 1, y0: 0, y1: 1 };   // видимая область (зум)
   const plot = () => ({ x: PAD.l, y: PAD.t, w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b });
-  const X = (fpr) => plot().x + fpr * plot().w;
-  const Y = (tpr) => plot().y + plot().h - tpr * plot().h;
+  const X = (fpr) => { const p = plot(); return p.x + (fpr - view.x0) / (view.x1 - view.x0) * p.w; };
+  const Y = (tpr) => { const p = plot(); return p.y + p.h - (tpr - view.y0) / (view.y1 - view.y0) * p.h; };
+  const fprAt = (Xp) => { const p = plot(); return view.x0 + (Xp - p.x) / p.w * (view.x1 - view.x0); };
+  const tprAt = (Yp) => { const p = plot(); return view.y0 + (p.y + p.h - Yp) / p.h * (view.y1 - view.y0); };
+  function resetView() { view.x0 = 0; view.x1 = 1; view.y0 = 0; view.y1 = 1; }
+  function clampView() {
+    const wx = view.x1 - view.x0, wy = view.y1 - view.y0;
+    if (view.x0 < 0) { view.x0 = 0; view.x1 = wx; } if (view.x1 > 1) { view.x1 = 1; view.x0 = 1 - wx; }
+    if (view.y0 < 0) { view.y0 = 0; view.y1 = wy; } if (view.y1 > 1) { view.y1 = 1; view.y0 = 1 - wy; }
+  }
 
   function drawROC() {
     if (!W) return;
     const p = plot(), k = cur(), N = DATA.length;
     ctx.clearRect(0, 0, W, H);
 
-    ctx.strokeStyle = "rgba(20,23,28,.06)"; ctx.fillStyle = "#8a93a3"; ctx.font = "11px -apple-system, system-ui, sans-serif";
-    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
-      ctx.beginPath(); ctx.moveTo(X(t), p.y); ctx.lineTo(X(t), p.y + p.h); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(p.x, Y(t)); ctx.lineTo(p.x + p.w, Y(t)); ctx.stroke();
-      ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(t.toFixed(2), X(t), p.y + p.h + 6);
-      ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(t.toFixed(2), p.x - 7, Y(t));
+    ctx.strokeStyle = "rgba(20,23,28,.06)"; ctx.fillStyle = "#8a93a3"; ctx.font = "11px -apple-system, system-ui, sans-serif"; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const fx = view.x0 + (view.x1 - view.x0) * i / 4, fy = view.y0 + (view.y1 - view.y0) * i / 4;
+      const gx = X(fx), gy = Y(fy);
+      ctx.beginPath(); ctx.moveTo(gx, p.y); ctx.lineTo(gx, p.y + p.h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.x, gy); ctx.lineTo(p.x + p.w, gy); ctx.stroke();
+      ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText(fx.toFixed(2), gx, p.y + p.h + 6);
+      ctx.textAlign = "right"; ctx.textBaseline = "middle"; ctx.fillText(fy.toFixed(2), p.x - 7, gy);
     }
     ctx.fillStyle = "#5b6472"; ctx.font = "11.5px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "top";
     ctx.fillText("FPR — ложные тревоги", p.x + p.w / 2, p.y + p.h + 22);
     ctx.save(); ctx.translate(p.x - 36, p.y + p.h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText("TPR — Recall", 0, 0); ctx.restore();
+
+    // клип под зум: всё содержимое поля рисуем внутри прямоугольника
+    ctx.save(); ctx.beginPath(); ctx.rect(p.x, p.y, p.w, p.h); ctx.clip();
 
     // площадь под кривой
     ctx.beginPath(); ctx.moveTo(X(0), Y(0));
@@ -148,10 +162,13 @@
     }
     ctx.lineCap = "butt";
 
-    // вершины: для небольших N — все; для больших — только текущая
-    if (N <= 40) {
+    // вершины: для небольших N или при зуме — все видимые; иначе только текущая
+    const showAll = N <= 40 || (view.x1 - view.x0) < 0.55;
+    if (showAll) {
       for (let i = 0; i < PTS.length; i++) {
-        ctx.beginPath(); ctx.arc(X(PTS[i].fpr), Y(PTS[i].tpr), i === k ? 7 : 3.3, 0, 7);
+        const vx = X(PTS[i].fpr), vy = Y(PTS[i].tpr);
+        if (vx < p.x - 8 || vx > p.x + p.w + 8 || vy < p.y - 8 || vy > p.y + p.h + 8) continue;
+        ctx.beginPath(); ctx.arc(vx, vy, i === k ? 7 : 3.3, 0, 7);
         ctx.fillStyle = i === k ? ACCENT : (i <= k ? "#94a3b8" : "#cbd5e1"); ctx.fill();
         if (i === k) { ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke(); }
       }
@@ -160,6 +177,7 @@
       ctx.beginPath(); ctx.arc(X(pt.fpr), Y(pt.tpr), 7, 0, 7);
       ctx.fillStyle = ACCENT; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
     }
+    ctx.restore();  // снять клип
   }
 
   // ---------- статистика ----------
@@ -184,23 +202,47 @@
 
   function renderAll() { updateTable(); drawROC(); renderStats(); }
 
-  // ---------- наведение/клик по кривой ----------
-  canvas.addEventListener("mousemove", (e) => {
-    const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-    let best = -1, bd = 16;
-    for (let i = 0; i < PTS.length; i++) {
-      const d = Math.hypot(mx - X(PTS[i].fpr), my - Y(PTS[i].tpr));
-      if (d < bd) { bd = d; best = i; }
+  // ---------- наведение / клик / зум-пан по кривой ----------
+  function localXY(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  function nearestPt(mx, my, rad) {
+    let best = -1, bd = rad;
+    for (let i = 0; i < PTS.length; i++) { const d = Math.hypot(mx - X(PTS[i].fpr), my - Y(PTS[i].tpr)); if (d < bd) { bd = d; best = i; } }
+    return best;
+  }
+  canvas.addEventListener("mousedown", (e) => { const [mx, my] = localXY(e); state.drag = { mx, my, v: { ...view }, moved: false }; });
+  window.addEventListener("mousemove", (e) => {
+    const [mx, my] = localXY(e), p = plot();
+    if (state.drag) {                                   // перетаскивание = пан
+      const dx = (mx - state.drag.mx) / p.w * (state.drag.v.x1 - state.drag.v.x0);
+      const dy = (my - state.drag.my) / p.h * (state.drag.v.y1 - state.drag.v.y0);
+      if (Math.abs(mx - state.drag.mx) + Math.abs(my - state.drag.my) > 4) state.drag.moved = true;
+      view.x0 = state.drag.v.x0 - dx; view.x1 = state.drag.v.x1 - dx;
+      view.y0 = state.drag.v.y0 + dy; view.y1 = state.drag.v.y1 + dy;
+      clampView(); drawROC(); return;
     }
+    if (mx < p.x || mx > p.x + p.w || my < p.y || my > p.y + p.h) { if (state.hover >= 0) { state.hover = -1; renderAll(); } return; }
+    const best = nearestPt(mx, my, 16);
     if (best !== state.hover) { state.hover = best; renderAll(); }
   });
-  canvas.addEventListener("mouseleave", () => { if (state.hover >= 0) { state.hover = -1; renderAll(); } });
-  canvas.addEventListener("click", (e) => {
-    const r = canvas.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-    let best = -1, bd = 22;
-    for (let i = 0; i < PTS.length; i++) { const d = Math.hypot(mx - X(PTS[i].fpr), my - Y(PTS[i].tpr)); if (d < bd) { bd = d; best = i; } }
-    if (best >= 0) { stopAnim(); state.pinned = best; state.hover = -1; renderAll(); }
+  window.addEventListener("mouseup", (e) => {
+    if (state.drag && !state.drag.moved) {              // клик без движения = выбрать точку
+      const [mx, my] = localXY(e), best = nearestPt(mx, my, 22);
+      if (best >= 0) { stopAnim(); state.pinned = best; state.hover = -1; renderAll(); }
+    }
+    state.drag = null;
   });
+  canvas.addEventListener("mouseleave", () => { if (!state.drag && state.hover >= 0) { state.hover = -1; renderAll(); } });
+  canvas.addEventListener("wheel", (e) => {            // колесо = зум к курсору
+    e.preventDefault();
+    const [mx, my] = localXY(e), p = plot();
+    const f = e.deltaY < 0 ? 0.82 : 1.22;
+    const wx = clamp((view.x1 - view.x0) * f, 0.03, 1), wy = clamp((view.y1 - view.y0) * f, 0.03, 1);
+    const fx = fprAt(mx), fy = tprAt(my);
+    view.x0 = fx - (mx - p.x) / p.w * wx; view.x1 = view.x0 + wx;
+    view.y0 = fy - (p.y + p.h - my) / p.h * wy; view.y1 = view.y0 + wy;
+    clampView(); drawROC();
+  }, { passive: false });
+  canvas.addEventListener("dblclick", () => { resetView(); drawROC(); });
 
   // ---------- анимация ----------
   function stopAnim() { if (state.timer) { clearInterval(state.timer); state.timer = 0; } }
@@ -223,6 +265,7 @@
   });
   $("#newData").addEventListener("click", () => { stopAnim(); state.seed = (state.seed * 1103515245 + 12345) >>> 0; rebuild(); });
   $("#build").addEventListener("click", build);
+  $("#zoomReset").addEventListener("click", () => { resetView(); drawROC(); });
   window.addEventListener("resize", resize);
 
   // ---------- старт ----------

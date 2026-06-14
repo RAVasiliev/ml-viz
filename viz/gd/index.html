@@ -47,6 +47,9 @@
       border-radius: 9px; font: inherit; font-weight: 650; font-size: 13px; color: var(--muted); cursor: pointer; transition: background .12s, border-color .12s, color .12s; }
     .chip:hover { border-color: var(--faint); }
     .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    /* чекбокс */
+    .chk { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
+    .chk input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
   </style>
 </head>
 <body>
@@ -121,6 +124,15 @@
         </div>
 
         <div class="control">
+          <label class="chk"><input type="checkbox" id="multi" /> Мультиспуск — из многих точек сразу</label>
+          <div id="multiCountCtrl" style="display:none;margin-top:10px">
+            <label for="multiCount">Стартов <span class="val" id="multiCountVal">24</span></label>
+            <input type="range" id="multiCount" min="4" max="60" step="1" value="24" />
+          </div>
+          <div class="hint">Запускает много спусков сразу — видно бассейны притяжения: кто добежит до глобального минимума (🟢), а кто застрянет в локальной яме (🟠).</div>
+        </div>
+
+        <div class="control">
           <label for="speed">Скорость анимации <span class="val" id="speedVal">35</span></label>
           <input type="range" id="speed" min="1" max="100" step="1" value="35" />
         </div>
@@ -137,13 +149,23 @@
         </div>
 
         <div class="control">
-          <div class="stats">
-            <div class="stat"><div class="num" id="statStep">0</div><div class="lbl">шаг</div></div>
-            <div class="stat"><div class="num" id="statL">—</div><div class="lbl">текущее L</div></div>
-            <div class="stat"><div class="num" id="statGrad">—</div><div class="lbl">‖∇L‖</div></div>
-            <div class="stat"><div class="num" id="statBest">—</div><div class="lbl">мин. L пути</div></div>
+          <div id="singleInfo">
+            <div class="stats">
+              <div class="stat"><div class="num" id="statStep">0</div><div class="lbl">шаг</div></div>
+              <div class="stat"><div class="num" id="statL">—</div><div class="lbl">текущее L</div></div>
+              <div class="stat"><div class="num" id="statGrad">—</div><div class="lbl">‖∇L‖</div></div>
+              <div class="stat"><div class="num" id="statBest">—</div><div class="lbl">мин. L пути</div></div>
+            </div>
+            <div class="progress"><span id="progressBar"></span></div>
           </div>
-          <div class="progress"><span id="progressBar"></span></div>
+          <div id="multiInfo" style="display:none">
+            <div class="stats">
+              <div class="stat"><div class="num" id="mTarget" style="color:#10b981">0</div><div class="lbl">🎯 у цели</div></div>
+              <div class="stat"><div class="num" id="mStuck" style="color:#f59e0b">0</div><div class="lbl">в локальной яме</div></div>
+              <div class="stat"><div class="num" id="mRun" style="color:#4f46e5">0</div><div class="lbl">ещё идут</div></div>
+              <div class="stat"><div class="num" id="mTotal">0</div><div class="lbl">всего стартов</div></div>
+            </div>
+          </div>
         </div>
       </aside>
 

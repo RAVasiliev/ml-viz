@@ -75,59 +75,49 @@
     tb.appendChild(sum);
   }
 
-  // ---------- сборка метрик (KaTeX) ----------
-  let termEls = [];                       // индекс арбуза -> [DOM-элементы слагаемых]
-  const KT = (tex) => (window.katex ? katex.renderToString("\\displaystyle " + tex, { throwOnError: false, trust: true, strict: false }) : tex);
-  const tmpl = (rows) => `<div class="mtemplate">${rows.map(([l, t]) => `<div><span class="tag">${l}</span> ${t}</div>`).join("")}</div>`;
+  // ---------- сборка метрик ----------
+  let maeTerms = [], mseTerms = [];
+  function terms(field, color) {
+    return active().map((d) =>
+      `<span class="term" data-i="${d.i}" style="color:${color}">${d[field]}</span>`).join(" + ");
+  }
   function renderMetrics() {
     const m = metrics();
     const big = active().reduce((a, d) => (d.ae > a.ae ? d : a), active()[0]); // крупнейший по |e|
+    const frac = (a, b) => `<span class="frac"><span class="num">${a}</span><span class="den">${b}</span></span>`;
+    const sqrtm = (inner) => `<span class="sqrtm"><span class="sgn">√</span><span class="rad">${inner}</span></span>`;
+    const SUM = `<span class="sumop">Σ<sup>n</sup><sub>i=1</sub></span>`;
+    const yi = `<i>y<sub>i</sub></i>`, yhi = `<i>ŷ<sub>i</sub></i>`, oneN = frac("1", "<i>n</i>");
     const A = approx(m.mae), S = approx(m.mse), R = approx(m.rmse);
-    const eqA = A.eq === "=" ? "=" : "\\approx", eqS = S.eq === "=" ? "=" : "\\approx";
-    const sumAE = active().map((d) => `\\htmlClass{term term-${d.i} kmae}{${d.ae}}`).join("+");
-    const sumSE = active().map((d) => `\\htmlClass{term term-${d.i} kmse}{${d.se}}`).join("+");
-    const maeTex = `\\mathrm{MAE}=\\frac1n\\sum_{i=1}^{n}\\lvert y_i-\\hat y_i\\rvert=\\frac{${sumAE}}{${m.n}}=\\frac{${m.sae}}{${m.n}} ${eqA} \\htmlClass{kres kmae}{${A.s}}`;
-    const mseTex = `\\mathrm{MSE}=\\frac1n\\sum_{i=1}^{n}(y_i-\\hat y_i)^2=\\frac{${sumSE}}{${m.n}}=\\frac{${m.sse}}{${m.n}} ${eqS} \\htmlClass{kres kmse}{${S.s}}`;
-    const rmseTex = `\\mathrm{RMSE}=\\sqrt{\\frac1n\\sum_{i=1}^{n}(y_i-\\hat y_i)^2}=\\sqrt{\\frac{${m.sse}}{${m.n}}}=\\sqrt{${S.s}}\\approx \\htmlClass{kres krmse}{${R.s}}`;
     $("#metrics").innerHTML =
-      `<div class="mrow"><div class="mhead"><span class="mname mae-c">MAE</span><span class="mq">средняя абсолютная ошибка · Mean Absolute Error</span></div>` +
-        `<div class="metric-eq">${KT(maeTex)}<span class="unit mae-c">кг</span></div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "на сколько килограммов модель в среднем промахивается."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — как у таргета (кг)."],
-          ["Когда брать:", "все ошибки равноценны, в данных есть выбросы, нужна простая интерпретация."],
-          ["Ограничения:", "не отличает «много мелких» от «один крупный»; как лосс плохо дифференцируема в нуле."],
-        ]) + `</div>` +
+      `<div class="mrow"><div class="mhead"><span class="mname mae-c">MAE</span>
+        <span class="mdesc">средняя абсолютная ошибка — типичный промах в килограммах</span></div>
+        <div class="mline math"><span class="mlabel mae-c">MAE</span> = ${oneN} ${SUM} |${yi} − ${yhi}|
+          = ${frac(terms("ae", MAE_C), m.n)} = ${frac(m.sae, m.n)} ${A.eq}
+          <span class="res mae-c">${A.s} кг</span></div></div>` +
 
-      `<div class="mrow"><div class="mhead"><span class="mname mse-c">MSE</span><span class="mq">средний квадрат ошибки · Mean Squared Error</span></div>` +
-        `<div class="metric-eq">${KT(mseTex)}<span class="unit mse-c">кг²</span></div>` +
-        `<div class="mnote">Арбуз №${big.i + 1} с ошибкой <i>e</i> = ${big.e}: в сумму |e| даёт <b style="color:#10b981">${big.ae}</b>, а в сумму e² — уже <b style="color:#4f46e5">${big.se}</b>; квадрат усиливает крупные промахи.</div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "насколько велики ошибки, если крупные штрафовать особенно сильно."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — кг² (трудно интерпретировать)."],
-          ["Когда брать:", "крупные ошибки критичны; данные чистые; нужен гладкий лосс для градиентного спуска."],
-          ["Ограничения:", "единицы в квадрате; очень чувствительна к выбросам — один промах в квадрате может доминировать."],
-        ]) + `</div>` +
+      `<div class="mrow"><div class="mhead"><span class="mname mse-c">MSE</span>
+        <span class="mdesc">средний квадрат ошибки — крупный промах входит в квадрате, единицы кг²</span></div>
+        <div class="mline math"><span class="mlabel mse-c">MSE</span> = ${oneN} ${SUM} (${yi} − ${yhi})²
+          = ${frac(terms("se", MSE_C), m.n)} = ${frac(m.sse, m.n)} ${S.eq}
+          <span class="res mse-c">${S.s} кг²</span></div>
+        <div class="mdesc" style="margin-top:6px">Арбуз №${big.i + 1}, ошибка <span class="math"><i>e</i> = ${big.e}</span>: в <span class="math">Σ|<i>e<sub>i</sub></i>|</span> добавляет <b style="color:#10b981">${big.ae}</b>, а в <span class="math">Σ<i>e<sub>i</sub></i>²</span> — уже <b style="color:#4f46e5">${big.se}</b>. Квадрат усиливает крупные ошибки.</div></div>` +
 
-      `<div class="mrow"><div class="mhead"><span class="mname rmse-c">RMSE</span><span class="mq">корень из среднего квадрата · Root Mean Squared Error</span></div>` +
-        `<div class="metric-eq">${KT(rmseTex)}<span class="unit rmse-c">кг</span></div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "какова типичная ошибка в килограммах, но с повышенным штрафом за крупные промахи."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — как у таргета (кг), в отличие от MSE."],
-          ["Когда брать:", "нужно отчитаться в исходных единицах, но всё ещё сильнее наказывать крупные ошибки."],
-          ["Ограничения:", "чувствительна к выбросам (наследует от MSE); не различает множество мелких и один крупный промах."],
-        ]) + `</div>`;
-    termEls = [];
-    active().forEach((d) => {
-      const els = [...$("#metrics").querySelectorAll(`.term-${d.i}`)];
-      termEls[d.i] = els;
-      els.forEach((el) => {
-        el.addEventListener("mouseenter", () => setHover(d.i));
-        el.addEventListener("mouseleave", () => setHover(-1));
-        el.addEventListener("click", () => setPin(d.i));
-      });
-    });
+      `<div class="mrow"><div class="mhead"><span class="mname rmse-c">RMSE</span>
+        <span class="mdesc">корень из среднего квадрата — снова килограммы, сравнимо с MAE</span></div>
+        <div class="mline math"><span class="mlabel rmse-c">RMSE</span> = ${sqrtm(`${oneN} ${SUM} (${yi} − ${yhi})²`)}
+          = ${sqrtm(frac(m.sse, m.n))} = ${sqrtm(S.s)} ${R.eq}
+          <span class="res rmse-c">${R.s} кг</span></div></div>`;
+    maeTerms = []; mseTerms = [];
+    $("#metrics").querySelectorAll(".mrow:nth-child(1) .term").forEach((t) => { maeTerms[+t.dataset.i] = t; bindTerm(t); });
+    $("#metrics").querySelectorAll(".mrow:nth-child(2) .term").forEach((t) => { mseTerms[+t.dataset.i] = t; bindTerm(t); });
   }
+  function bindTerm(t) {
+    t.addEventListener("mouseenter", () => setHover(+t.dataset.i));
+    t.addEventListener("mouseleave", () => setHover(-1));
+    t.addEventListener("click", () => setPin(+t.dataset.i));
+  }
+
   function renderVerdict() {
     const all = metricsOf(DATA), cut = metricsOf(DATA.filter((d) => d.i !== OUT));
     const o = DATA[OUT];
@@ -140,15 +130,11 @@
   function effIndex() { return state.pinned >= 0 ? state.pinned : state.hover; }
   function applyHL(i) {
     if (i !== state.shown) {
-      const tog = (idx, add) => {
-        if (idx < 0) return;
-        if (cards[idx]) cards[idx].classList.toggle("hl", add);
-        if (rows[idx]) rows[idx].classList.toggle("hl", add);
-        (termEls[idx] || []).forEach((e) => e.classList.toggle("hl", add));
-      };
-      tog(state.shown, false);
+      const off = (arr) => { const el = arr[state.shown]; if (el) el.classList.remove("hl"); };
+      off(cards); off(rows); off(maeTerms); off(mseTerms);
       state.shown = i;
-      tog(i, true);
+      const on = (arr) => { const el = arr[i]; if (el) el.classList.add("hl"); };
+      if (i >= 0) { on(cards); on(rows); on(maeTerms); on(mseTerms); }
     }
     drawChart(); drawCurves();
   }
@@ -250,40 +236,51 @@
   function drawCurves() {
     if (!cctx || !CW) return;
     cctx.clearRect(0, 0, CW, CH);
-    const pad = { l: 46, r: 18, t: 18, b: 38 };
+    const pad = { l: 46, r: 16, t: 16, b: 36 };
     const x0 = pad.l, y0 = pad.t, pw = CW - pad.l - pad.r, ph = CH - pad.t - pad.b;
-    const pts = active();
-    const E = Math.max(4, ...pts.map((d) => d.ae)), ymax = E * E;
-    const PX = (e) => x0 + (e + E) / (2 * E) * pw, PY = (y) => y0 + ph - Math.min(y, ymax) / ymax * ph;
-    // ось Y + горизонтальная сетка
-    cctx.font = "11px -apple-system, system-ui, sans-serif";
+    const pts = active(), mm = metrics();
+    const xmax = Math.max(4, ...pts.map((d) => d.ae)), ymax = xmax * xmax;
+    const PX = (x) => x0 + x / xmax * pw, PY = (y) => y0 + ph - Math.min(y, ymax) / ymax * ph;
+    // сетка и оси
+    cctx.font = "11px -apple-system, system-ui, sans-serif"; cctx.strokeStyle = "rgba(20,23,28,.06)";
     cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
-    for (let k = 0; k <= 4; k++) { const yy = ymax * k / 4, Y = PY(yy); cctx.strokeStyle = "rgba(20,23,28,.06)"; cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(Math.round(yy) + "", x0 - 7, Y); }
-    // ось X (ошибка e со знаком, от −E до +E)
+    for (let k = 0; k <= 4; k++) { const yy = ymax * k / 4, Y = PY(yy); cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(Math.round(yy) + "", x0 - 7, Y); }
     cctx.textAlign = "center"; cctx.textBaseline = "alphabetic";
-    for (let e = -E; e <= E; e++) { const X = PX(e); cctx.strokeStyle = e === 0 ? "rgba(20,23,28,.18)" : "rgba(20,23,28,.05)"; cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.fillStyle = "#8a93a3"; cctx.fillText((e > 0 ? "+" + e : e) + "", X, y0 + ph + 16); }
-    cctx.fillText("ошибка  e = y − ŷ", x0 + pw / 2, y0 + ph + 31);
-    cctx.save(); cctx.translate(13, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("штраф  L(e)", 0, 0); cctx.restore();
-    // функции потерь: L(e)=|e| (галочка) и L(e)=e² (парабола)
-    const curve = (fn, color) => { cctx.strokeStyle = color; cctx.lineWidth = 2.8; cctx.beginPath(); for (let s = 0; s <= 200; s++) { const e = -E + 2 * E * s / 200, X = PX(e), Y = PY(fn(e)); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); };
-    curve((e) => e * e, "#4f46e5");
-    curve((e) => Math.abs(e), "#10b981");
-    // подписи кривых
-    cctx.font = "italic 13px Georgia, serif"; cctx.textBaseline = "middle";
-    cctx.textAlign = "right"; cctx.fillStyle = "#10b981"; cctx.fillText("L = |e|", PX(E) - 4, PY(E) - 11);
-    cctx.textAlign = "left"; cctx.fillStyle = "#4f46e5"; cctx.fillText("L = e²", PX(-E) + 4, PY((0.84 * E) * (0.84 * E)));
-    // наши арбузы — точки на обеих кривых при своей ошибке e
+    for (let k = 0; k <= xmax; k++) cctx.fillText(k + "", PX(k), y0 + ph + 16);
+    cctx.fillText("ошибка |e|, кг", x0 + pw / 2, y0 + ph + 30);
+    cctx.save(); cctx.translate(13, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("штраф", 0, 0); cctx.restore();
+    // функции потерь L(e)=|e| и L(e)=e²
+    const curve = (fn, color) => { cctx.strokeStyle = color; cctx.lineWidth = 2.6; cctx.beginPath(); for (let s = 0; s <= 120; s++) { const x = xmax * s / 120, X = PX(x), Y = PY(fn(x)); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); };
+    curve((x) => x * x, "#4f46e5");
+    curve((x) => x, "#10b981");
+    // средние = метрики (горизонтальный пунктир)
+    const hline = (yv, color, label) => {
+      const Y = PY(yv); cctx.strokeStyle = color; cctx.lineWidth = 1.5; cctx.setLineDash([5, 4]);
+      cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.setLineDash([]);
+      cctx.fillStyle = color; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "right"; cctx.textBaseline = "bottom"; cctx.fillText(label, x0 + pw - 3, Y - 2);
+    };
+    const aM = approx(mm.mse), aA = approx(mm.mae), aR = approx(mm.rmse);
+    hline(mm.mse, "#4f46e5", "MSE " + aM.eq + " " + aM.s);
+    hline(mm.mae, "#10b981", "MAE " + aA.eq + " " + aA.s);
+    // RMSE = √MSE: пересечение линии MSE с параболой → проекция на ось e
+    const rmse = Math.sqrt(mm.mse), Xr = PX(rmse), Yr = PY(mm.mse);
+    cctx.strokeStyle = "#8b5cf6"; cctx.lineWidth = 1.6; cctx.setLineDash([4, 4]);
+    cctx.beginPath(); cctx.moveTo(Xr, Yr); cctx.lineTo(Xr, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
+    cctx.beginPath(); cctx.arc(Xr, Yr, 4.5, 0, 7); cctx.fillStyle = "#8b5cf6"; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke();
+    cctx.fillStyle = "#8b5cf6"; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "top"; cctx.fillText("RMSE " + aR.eq + " " + aR.s, Xr, y0 + ph - 15);
+    // наши арбузы как точки на кривых
     const hi = effIndex();
     for (const d of pts) {
-      const X = PX(d.e), hot = d.i === hi;
-      cctx.globalAlpha = hot ? 1 : 0.62;
+      if (d.ae === 0) continue;
+      const X = PX(d.ae), hot = d.i === hi;
+      cctx.globalAlpha = hot ? 1 : 0.6;
       cctx.beginPath(); cctx.arc(X, PY(d.se), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#4f46e5"; cctx.fill();
-      cctx.beginPath(); cctx.arc(X, PY(Math.abs(d.e)), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#10b981"; cctx.fill();
+      cctx.beginPath(); cctx.arc(X, PY(d.ae), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#10b981"; cctx.fill();
       cctx.globalAlpha = 1;
       if (hot) {
         cctx.strokeStyle = "rgba(20,23,28,.3)"; cctx.setLineDash([4, 4]); cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
-        [["#4f46e5", d.se], ["#10b981", Math.abs(d.e)]].forEach(([c, v]) => { cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
-        const txt = "арбуз №" + (d.i + 1) + ":  e = " + d.e + ",  |e| = " + d.ae + ",  e² = " + d.se;
+        [["#4f46e5", d.se], ["#10b981", d.ae]].forEach(([c, v]) => { cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
+        const txt = "арбуз №" + (d.i + 1) + ": |e| = " + d.ae + ",  e² = " + d.se;
         cctx.font = "700 11px -apple-system, sans-serif"; const tw = cctx.measureText(txt).width + 16;
         let tx = X + 10; if (tx + tw > CW - 4) tx = X - tw - 10;
         cctx.fillStyle = "rgba(20,23,28,.9)"; roundRect(cctx, tx, y0 + 4, tw, 22, 7); cctx.fill();

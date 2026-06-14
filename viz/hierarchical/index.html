@@ -6,7 +6,30 @@
   <title>Иерархическая кластеризация — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    .lead { max-width:820px; }
+    .lead b { color:var(--ink); }
+    .teach { display:grid; grid-template-columns:1.05fr 1fr; gap:16px; margin-top:16px; max-width:900px; }
+    @media (max-width:760px){ .teach { grid-template-columns:1fr; } }
+    .teach-card { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+      padding:14px 16px; box-shadow:var(--shadow-sm); }
+    .teach-card h3 { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+      color:var(--faint); margin:0 0 10px; }
+    .kf { margin:8px 0; overflow-x:auto; overflow-y:hidden; }
+    .katex { font-size:1.05em; }
+    .kf-note { font-size:13px; line-height:1.5; color:var(--muted); margin:3px 0 12px; }
+    .kf-note b { color:var(--ink); }
+    .kf-note:last-child { margin-bottom:2px; }
+    .teach ul { margin:0; padding-left:18px; }
+    .teach li { font-size:13.5px; line-height:1.55; color:var(--muted); margin-bottom:8px; }
+    .teach li:last-child { margin-bottom:0; }
+    .teach li b { color:var(--ink); }
+    .teach code { font-family:var(--mono); font-size:12.5px; background:var(--surface-2);
+      border:1px solid var(--line); border-radius:5px; padding:0 5px; color:var(--ink); }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -23,7 +46,24 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Кластеризация · Иерархическая</div>
       <h1>Иерархическая (агломеративная) кластеризация</h1>
-      <p>Снизу вверх: сначала каждая точка — отдельный кластер, затем на каждом шаге сливаются два ближайших — и так до единого корня. Способ измерять «близость» кластеров задаёт <b>linkage</b> и сильно меняет форму результата. Дендрограмма строится целиком, а ползунок <b>«Срез на K»</b> проводит горизонтальный порог: ниже него — K цветных кластеров, выше — серые ветви.</p>
+      <p class="lead">Представь, что строишь <b>семейное древо похожести</b>. Сначала каждый объект — сам себе семья из одного. Дальше смотришь, какие <b>две группы ближе всех друг к другу</b>, и роднишь их в одну — и так шаг за шагом, снизу вверх, пока всё не сольётся в <b>единый род-корень</b>. Получается дерево вложенных кластеров — <b>дендрограмма</b>: высота, на которой две ветви срослись, говорит, <b>насколько далеко</b> пришлось тянуться, чтобы их объединить. Близкую родню сливаем рано (внизу), дальнюю — поздно (вверху). А чтобы получить готовые группы, проводим <b>горизонтальный срез</b> на нужной высоте: сколько ветвей он пересёк — столько и кластеров. Хочешь <b>K</b> групп — двигаешь срез выше или ниже. Как именно мерить «близость» двух семей — задаёт <b>linkage</b>, и от него форма кластеров меняется сильно.</p>
+
+      <div class="teach">
+        <div class="teach-card">
+          <h3>Формула курса</h3>
+          <div class="kf" data-tex="d(i\cup j,\,k)=\alpha_i\,d_{ik}+\alpha_j\,d_{jk}+\beta\,d_{ij}+\gamma\lvert d_{ik}-d_{jk}\rvert" data-block></div>
+          <div class="kf-note"><b>Пересчёт расстояний по Лансу–Уильямсу.</b> Слили семьи <i>i</i> и <i>j</i> в одну — нужно узнать расстояние от новой семьи <i>i</i>∪<i>j</i> до каждой оставшейся семьи <i>k</i>. Формула собирает его из <b>уже известных</b> расстояний <i>d<sub>ik</sub></i>, <i>d<sub>jk</sub></i>, <i>d<sub>ij</sub></i> — не пересчитывая всё с нуля по точкам. Коэффициенты <i>α, β, γ</i> — это и есть выбранный <b>linkage</b>: для <code>single</code> — <i>α<sub>i</sub>=α<sub>j</sub>=½, β=0, γ=−½</i> (берётся минимум из двух), для <code>complete</code> те же <i>α, β</i>, но <i>γ=+½</i> (максимум), а <code>ward</code> подставляет свои <i>α, β, γ</i>, чтобы минимизировать прирост внутрикластерной дисперсии. Меняешь linkage — меняешь коэффициенты — меняешь, кто с кем сольётся следующим.</div>
+        </div>
+        <div class="teach-card">
+          <h3>Что видно · что покрутить</h3>
+          <ul>
+            <li><b>Двигай «Срез на K».</b> Пунктир на дендрограмме едет вверх-вниз; сколько ветвей он перерезал — столько цветных кластеров на поле. Это и есть «выбор числа кластеров срезом дерева» — сам алгоритм не перезапускается, только перекрашивается.</li>
+            <li><b>Переключи linkage на <code>single</code>.</b> Минимальное расстояние тянет «мостики» — кластеры вытягиваются в <b>цепочки</b> вдоль плотных дорожек, чувствительны к шуму. Это видно по тому, какие точки склеились первыми.</li>
+            <li><b>Сравни с <code>ward</code> (по умолчанию в курсе).</b> Он минимизирует прирост дисперсии — кластеры выходят <b>компактными «шарами»</b> примерно одного размера. На тех же данных форма результата заметно другая.</li>
+            <li><b>Смотри на высоту ветвей.</b> Длинная ветвь у корня = две далёкие группы пришлось тянуть силой. Естественное число кластеров — там, где есть <b>большой вертикальный зазор</b> между соседними слияниями: режь по нему.</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="lab-grid">
@@ -106,5 +146,6 @@
   <script src="../../assets/js/datasets.js"></script>
   <script src="hierarchical.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

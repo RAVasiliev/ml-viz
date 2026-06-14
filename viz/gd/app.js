@@ -20,22 +20,25 @@
   const methTag = $("methTag"), formulaEl = $("formula");
   const batchCtrl = $("batchCtrl"), batchSel = $("batch"), bsCtrl = $("bsCtrl"), bsRange = $("batchSize"), bsVal = $("batchSizeVal");
   const hintEl = $("hint"), legendNote = $("legendNote");
-  const terrainCtrl = $("terrainCtrl"), bumpsRange = $("bumps"), bumpsVal = $("bumpsVal"), newTerrainBtn = $("newTerrain"), presetChips = $("presetChips");
+  const newTerrainBtn = $("newTerrain");
 
   let terrainSeed = 1, terrainK = 9;
-  let terrainFn = null;                 // текущий рельеф (пресет или случайный)
-  let terrainIdx = 0;                   // индекс активного пресета (-1 — случайный)
+  let terrainFn = null;                 // текущий случайный рельеф (для пункта «Случайный…»)
   const presetCache = {};
+
+  const multiChk = $("multi"), multiCountCtrl = $("multiCountCtrl"), multiCountRange = $("multiCount"), multiCountVal = $("multiCountVal");
+  const singleInfo = $("singleInfo"), multiInfo = $("multiInfo");
+  let multi = false, runners = [], multiCount = 24;
   function getPreset(i) {
     if (!presetCache[i]) { const p = GD.terrainPresets[i]; presetCache[i] = GD.makeTerrain(p.seed, p.bumps, p.style); }
     return presetCache[i];
   }
+  function isTerrainFig() { const v = funcSel.value; return v.indexOf("preset") === 0 || v === "random"; }
   function resolveFn() {
-    if (funcSel.value === "terrain") {
-      if (!terrainFn) { terrainFn = getPreset(0); terrainIdx = 0; }
-      return terrainFn;
-    }
-    return GD.funcs[funcSel.value];
+    const v = funcSel.value;
+    if (v.indexOf("preset") === 0) return getPreset(+v.slice(6));
+    if (v === "random") { if (!terrainFn) terrainFn = GD.makeTerrain(terrainSeed, terrainK, "mixed"); return terrainFn; }
+    return GD.funcs[v];
   }
 
   let fn = null;            // текущая функция потерь (объект из GD.funcs)
@@ -65,11 +68,19 @@
     twowells: "L = (x²−1)² + 0.5y² + 0.35x",
   };
 
-  GD.list.forEach((f) => {
-    const o = document.createElement("option");
-    o.value = f.id; o.textContent = f.name; funcSel.appendChild(o);
-  });
-  funcSel.value = "terrain";
+  (function buildFuncSelect() {
+    const add = (parent, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; parent.appendChild(o); };
+    const group = (label) => { const g = document.createElement("optgroup"); g.label = label; funcSel.appendChild(g); return g; };
+    const gR = group("Рельеф");
+    GD.terrainPresets.forEach((p, i) => add(gR, "preset" + i, p.name));
+    add(gR, "random", "🎲 Случайный…");
+    const gS = group("Особые");
+    add(gS, "spiral", "Спираль");
+    add(gS, "wavy", "Волнистый овраг");
+    const gD = group("Данные");
+    add(gD, "linreg", "Линейная регрессия (MSE)");
+  })();
+  funcSel.value = "preset0";
 
   /* ---------- геометрия поля (как в эталоне: квадрат min(W,H)) ---------- */
   function plot() {
@@ -212,19 +223,39 @@
   }
 
   /* ------------------------------ степпер ------------------------------ */
+  function makeStepper(s, extra) {
+    return new GD.Stepper(fn, {
+      lr: sliderToLR(), method: methodSel.value, beta: betaFromSlider(),
+      start: { u: s.u, v: s.v }, batchMode: batchSel.value, batchSize: +bsRange.value,
+      seed: ((seed ^ 0x9e3779b9) + (extra || 0)) >>> 0,
+    });
+  }
+  // стартовые точки мультиспуска — джиттер-сетка по домену
+  function multiStarts() {
+    const d = fn.domain, N = multiCount, r = GD.rng((seed * 2654435761) >>> 0 || 1);
+    const gy = Math.max(2, Math.round(Math.sqrt(N))), gx = Math.ceil(N / gy), out = [];
+    for (let j = 0; j < gy && out.length < N; j++) for (let i = 0; i < gx && out.length < N; i++) {
+      const fx = (i + 0.5) / gx, fy = (j + 0.5) / gy;
+      const u = d.umin + (0.07 + 0.86 * fx) * (d.umax - d.umin) + (r() - 0.5) * 0.7 * (d.umax - d.umin) / gx;
+      const v = d.vmin + (0.07 + 0.86 * fy) * (d.vmax - d.vmin) + (r() - 0.5) * 0.7 * (d.vmax - d.vmin) / gy;
+      out.push({ u, v });
+    }
+    return out;
+  }
+  function buildRunners() { runners = multiStarts().map((s, i) => makeStepper(s, (i + 1) * 0x9e37)); }
+  function allDone() { return runners.length > 0 && runners.every((r) => r.done); }
+  function statusColor(r) { return r.diverged ? "#ef4444" : r.nearTarget ? "#10b981" : r.converged ? "#f59e0b" : "#4f46e5"; }
+  function tracks() {
+    return multi
+      ? runners.map((r) => ({ path: r.path, color: statusColor(r), done: r.done }))
+      : (gd ? [{ path: gd.path, color: gd.done ? statusColor(gd) : "#ef4444", done: gd.done }] : []);
+  }
+
   function rebuild() {
     fn = resolveFn();
     if (!start) start = { u: fn.start.u, v: fn.start.v };
-    gd = new GD.Stepper(fn, {
-      lr: sliderToLR(),
-      method: methodSel.value,
-      beta: betaFromSlider(),
-      start: { u: start.u, v: start.v },
-      batchMode: batchSel.value,
-      batchSize: +bsRange.value,
-      seed: (seed ^ 0x9e3779b9) >>> 0,
-    });
-    bestL = gd.L;
+    if (multi) buildRunners();
+    else { gd = makeStepper({ u: start.u, v: start.v }); bestL = gd.L; }
     pause();
     updateStats();
     render();
@@ -233,15 +264,14 @@
   function betaFromSlider() { return +betaRange.value / 100; }
 
   function doStep() {
-    if (!gd || gd.done) return;
-    gd.next();
-    if (gd.L < bestL) bestL = gd.L;
+    if (multi) { for (const r of runners) if (!r.done) r.next(); }
+    else { if (!gd || gd.done) return; gd.next(); if (gd.L < bestL) bestL = gd.L; }
     updateStats();
   }
   function stepsPerSec() { const t = (+speedRange.value - 1) / 99; return Math.round(1 + 90 * t * t); }
 
   function play() {
-    if (!gd || gd.done) rebuild();
+    if (multi ? allDone() : (!gd || gd.done)) rebuild();
     playing = true; acc = 0; updatePlayBtn();
   }
   function pause() { playing = false; updatePlayBtn(); }
@@ -262,6 +292,17 @@
   }
 
   function updateStats() {
+    if (multi) {
+      singleInfo.style.display = "none"; multiInfo.style.display = "";
+      let t = 0, stuck = 0, run = 0;
+      for (const r of runners) { const s = r.stats(); if (s.nearTarget) t++; else if (s.converged || s.diverged) stuck++; else run++; }
+      $("mTarget").textContent = t; $("mStuck").textContent = stuck; $("mRun").textContent = run; $("mTotal").textContent = runners.length;
+      methTag.className = "meth-tag " + (run === 0 ? "converged" : "running");
+      methTag.textContent = run === 0 ? ("готово · 🎯 " + t + " у цели, 🟠 " + stuck + " застряли") : (playing ? "мультиспуск идёт…" : "пауза");
+      stepBtn.disabled = run === 0;
+      return;
+    }
+    singleInfo.style.display = ""; multiInfo.style.display = "none";
     if (!gd) return;
     const s = gd.stats();
     $("statStep").textContent = s.step;
@@ -296,7 +337,7 @@
   function render3D() {
     ctx.clearRect(0, 0, W, H);
     if (!fn || !grid3d || W <= 0) return;
-    GD3D.render(ctx, grid3d, fn, gd, cam, W, H);
+    GD3D.render(ctx, grid3d, fn, tracks(), cam, W, H);
   }
 
   function render2D() {
@@ -341,6 +382,9 @@
       ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.4; ctx.stroke();
     }
 
+    // мультиспуск — рисуем все траектории и выходим
+    if (multi) { drawMultiPaths2D(p); return; }
+
     // 4) траектория спуска
     if (gd && gd.path.length > 0) {
       // линия пути
@@ -370,19 +414,19 @@
         if (isFirst) { ctx.lineWidth = 2; ctx.strokeStyle = ACCENT; ctx.stroke(); }
       }
 
-      // текущая точка — крупная, красная, с гало
+      // текущая точка: ★ если остановились, иначе красная точка с гало + стрелка
       const last = gd.path[gd.path.length - 1];
       const [lx, ly] = uvToPX(last.u, last.v);
       const cx = Math.max(p.ox + 2, Math.min(p.ox + p.size - 2, lx));
       const cy = Math.max(p.oy + 2, Math.min(p.oy + p.size - 2, ly));
-      ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(239,68,68,.18)"; ctx.fill();
-      ctx.beginPath(); ctx.arc(cx, cy, 4.6, 0, Math.PI * 2);
-      ctx.fillStyle = CUR; ctx.fill();
-      ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
-
-      // стрелка антиградиента из текущей точки (направление шага)
-      if (!gd.done && inField(lx, ly, p)) drawGradArrow(last, cx, cy, p);
+      if (gd.done) {
+        drawStar(cx, cy, 10, statusColor(gd));
+      } else {
+        ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.fillStyle = "rgba(239,68,68,.18)"; ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, 4.6, 0, Math.PI * 2); ctx.fillStyle = CUR; ctx.fill();
+        ctx.lineWidth = 2; ctx.strokeStyle = "#fff"; ctx.stroke();
+        if (inField(lx, ly, p)) drawGradArrow(last, cx, cy, p);
+      }
     }
 
     // мини-график данных для линейной регрессии
@@ -414,6 +458,27 @@
     }
     ctx.fillStyle = "#5b6472"; ctx.font = "10px -apple-system, system-ui, sans-serif"; ctx.textAlign = "left";
     ctx.fillText("данные: y = w·x + b", ix + 9, iy + 14);
+  }
+
+  // мультиспуск: рисуем все траектории; цвет точки — статус бегунка
+  function drawMultiPaths2D(p) {
+    for (const r of runners) {
+      if (!r.path.length) continue;
+      const col = statusColor(r);
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 1.3; ctx.lineJoin = "round"; ctx.beginPath();
+      let started = false;
+      for (let i = 0; i < r.path.length; i++) {
+        const a = uvToPX(r.path[i].u, r.path[i].v);
+        const cx = Math.max(p.ox - 40, Math.min(p.ox + p.size + 40, a[0])), cy = Math.max(p.oy - 40, Math.min(p.oy + p.size + 40, a[1]));
+        if (!started) { ctx.moveTo(cx, cy); started = true; } else ctx.lineTo(cx, cy);
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+      const last = r.path[r.path.length - 1], a = uvToPX(last.u, last.v);
+      if (inField(a[0], a[1], p)) {
+        if (r.done) drawStar(a[0], a[1], 6.5, col);
+        else { ctx.beginPath(); ctx.arc(a[0], a[1], 3.4, 0, Math.PI * 2); ctx.fillStyle = col; ctx.fill(); ctx.lineWidth = 1.3; ctx.strokeStyle = "#fff"; ctx.stroke(); }
+      }
+    }
   }
 
   // стрелка −∇L (направление следующего шага), нормированной длины
@@ -519,6 +584,16 @@
   function inField(x, y, p) {
     return x >= p.ox - 1 && x <= p.ox + p.size + 1 && y >= p.oy - 1 && y <= p.oy + p.size + 1;
   }
+  // пятиконечная звезда — маркер «спуск остановился»
+  function drawStar(x, y, r, color) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * 0.45 : r;
+      const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = "#fff"; ctx.stroke();
+  }
   function roundRectPath(c, x, y, w, h, r) {
     r = Math.min(r, w / 2, h / 2);
     c.beginPath();
@@ -535,17 +610,17 @@
     requestAnimationFrame(loop);
     if (!lastT) lastT = t;
     const dt = t - lastT; lastT = t;
-    if (playing && gd && !gd.done) {
+    if (playing) {
       acc += dt;
       const interval = 1000 / stepsPerSec();
       let guard = 0;
-      while (acc >= interval && !gd.done && guard < 200) {
-        gd.next();
-        if (gd.L < bestL) bestL = gd.L;
-        acc -= interval; guard++;
+      if (multi && !allDone()) {
+        while (acc >= interval && !allDone() && guard < 200) { for (const r of runners) if (!r.done) r.next(); acc -= interval; guard++; }
+        updateStats(); if (allDone()) pause();
+      } else if (!multi && gd && !gd.done) {
+        while (acc >= interval && !gd.done && guard < 200) { gd.next(); if (gd.L < bestL) bestL = gd.L; acc -= interval; guard++; }
+        updateStats(); if (gd.done) pause();
       }
-      updateStats();
-      if (gd.done) pause();
     }
     render();
   }
@@ -555,44 +630,30 @@
     funcNote.textContent = fn.note;
     formulaEl.textContent = fn.formula || FORMULA[fn.id] || "";
   }
-  // показать/спрятать батч-контролы (только для функции на данных)
-  function updateBatchUI() {
-    batchCtrl.style.display = "";                 // батч-режим доступен на любой функции
+  function updateAux() {
     bsCtrl.style.display = batchSel.value === "mini" ? "" : "none";
-    terrainCtrl.style.display = funcSel.value === "terrain" ? "" : "none";
+    newTerrainBtn.style.display = isTerrainFig() ? "" : "none";
     const maxB = fn.isData ? fn.n : 32;
     bsRange.max = maxB;
     if (+bsRange.value > maxB) bsRange.value = Math.min(8, maxB);
     bsVal.textContent = bsRange.value;
   }
-  // применить текущий terrainFn и полностью обновить сцену
-  function applyTerrain() {
-    fn = terrainFn;
+  // обновить всю сцену под текущую fn
+  function refreshFigure() {
     start = { u: fn.start.u, v: fn.start.v };
     lrRange.value = lrToSlider(fn.lr0);
-    syncFuncUI(); syncLabels();
+    updateAux(); syncFuncUI(); syncLabels();
     buildField(); build3D(); setView(view);
-    highlightChips();
     rebuild();
   }
-  function loadPreset(i) { terrainFn = getPreset(i); terrainIdx = i; applyTerrain(); }
-  function regenTerrain() {
+  // сгенерировать новый случайный рельеф (пункт «🎲 Случайный…» и кнопка)
+  function regenRandom() {
     terrainSeed = (terrainSeed * 1664525 + 1013904223) >>> 0;
-    const style = ["mixed", "craters", "ridges"][terrainSeed % 3];   // случайный стиль для разнообразия
+    const style = ["mixed", "craters", "ridges", "dunes"][terrainSeed % 4];
     terrainFn = GD.makeTerrain(terrainSeed, terrainK, style);
-    terrainIdx = -1; applyTerrain();
-  }
-  function buildPresetChips() {
-    presetChips.innerHTML = "";
-    GD.terrainPresets.forEach((p, i) => {
-      const b = document.createElement("button");
-      b.className = "chip" + (i === terrainIdx ? " on" : ""); b.textContent = i + 1; b.dataset.idx = i;
-      b.addEventListener("click", () => loadPreset(i));
-      presetChips.appendChild(b);
-    });
-  }
-  function highlightChips() {
-    presetChips.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", +c.dataset.idx === terrainIdx));
+    funcSel.value = "random";
+    fn = terrainFn;
+    refreshFigure();
   }
   function setView(v) {
     view = v;
@@ -611,18 +672,11 @@
     speedVal.textContent = speedRange.value;
   }
 
-  // смена функции: новая стартовая точка по умолчанию + пересчёт диапазона lr
+  // смена фигуры в выпадашке
   function onFuncChange() {
+    if (funcSel.value === "random") { regenRandom(); return; }
     fn = resolveFn();
-    start = { u: fn.start.u, v: fn.start.v };
-    lrRange.value = lrToSlider(fn.lr0); // ставим рекомендованный lr
-    updateBatchUI();
-    syncFuncUI();
-    syncLabels();
-    buildField();
-    build3D();
-    setView(view); // обновить подсказку под тип функции
-    rebuild();
+    refreshFigure();
   }
 
   function newStart() {
@@ -649,10 +703,12 @@
   bsRange.addEventListener("input", () => { bsVal.textContent = bsRange.value; rebuild(); });
   newTerrainBtn.addEventListener("click", regenTerrain);
   bumpsRange.addEventListener("input", () => { terrainK = +bumpsRange.value; bumpsVal.textContent = terrainK; regenTerrain(); });
+  multiChk.addEventListener("change", () => { multi = multiChk.checked; multiCountCtrl.style.display = multi ? "" : "none"; rebuild(); });
+  multiCountRange.addEventListener("input", () => { multiCount = +multiCountRange.value; multiCountVal.textContent = multiCount; if (multi) rebuild(); });
 
   // клик по полю (только 2D) — задать стартовую точку
   canvas.addEventListener("click", (e) => {
-    if (view !== "2d" || dragMoved) return;
+    if (view !== "2d" || dragMoved || multi) return;
     const rect = canvas.getBoundingClientRect();
     const p = plot();
     if (p.size <= 0) return;

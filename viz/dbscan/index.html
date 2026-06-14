@@ -6,7 +6,26 @@
   <title>DBSCAN — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    .formula-card { background:var(--surface, #fff); border:1px solid var(--line, #e5e7eb); border-radius:12px;
+      padding:14px 16px; margin:14px 0 4px; max-width:760px; }
+    .formula-card .ftitle { font-size:12px; font-weight:650; letter-spacing:.02em; text-transform:uppercase;
+      color:var(--faint, #94a3b8); margin-bottom:8px; }
+    .kf { margin:8px 0; overflow-x:auto; }
+    .formula-card .katex { font-size:1.05em; }
+    .formula-card .fnote { font-size:13px; line-height:1.55; color:var(--muted, #475569); margin:8px 0 0; }
+    .formula-card .fnote b { color:var(--ink, #14171c); }
+    .intuition { background:var(--surface-2, #f8fafc); border:1px solid var(--line, #e5e7eb); border-radius:12px;
+      padding:14px 16px; margin:14px 0 4px; max-width:760px; }
+    .intuition .ftitle { font-size:12px; font-weight:650; letter-spacing:.02em; text-transform:uppercase;
+      color:var(--faint, #94a3b8); margin-bottom:8px; }
+    .intuition ul { margin:0; padding-left:18px; }
+    .intuition li { font-size:13.5px; line-height:1.6; color:var(--muted, #475569); margin:5px 0; }
+    .intuition li b { color:var(--ink, #14171c); }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -23,7 +42,24 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Кластеризация · DBSCAN</div>
       <h1>DBSCAN — плотностная кластеризация</h1>
-      <p>Алгоритм растит кластеры из «плотных» областей: точка становится <b>ядром</b>, если в её ε-окрестности не меньше <b>minPts</b> соседей. Кластер расширяется через соседей-ядер, а точки в разреженных местах помечаются как <b>шум</b>. Запусти по шагам и проследи логику.</p>
+      <p>Представь площадь вечером. Где люди стоят плотно — это компании: концерт, очередь за кофе, кружок танцоров. А кто бредёт сам по себе через пустое место — одиночка, ничей. DBSCAN делает ровно это: обводит вокруг каждого человечка кружок радиуса <b>ε</b> и считает, сколько соседей внутри. Много соседей (хотя бы <b>minPts</b>) — это <b>ядро</b> компании; от ядра компания разрастается на тех, кто стоит впритык. А кто в пустоте, без соседей, — тот <b>шум</b>: его ни к кому не приписываем. Красиво то, что заранее не нужно говорить, сколько компаний на площади, — алгоритм сам найдёт скопления, какой бы формы они ни были. Запусти по шагам и проследи, как растут компании.</p>
+    </div>
+
+    <div class="formula-card">
+      <div class="ftitle">Что считаем под капотом</div>
+      <div class="kf" data-tex="\varepsilon\text{-окрестность } N_\varepsilon(p)=\{q:\lVert p-q\rVert\le \varepsilon\}" data-block></div>
+      <div class="kf" data-tex="\text{ядро: } |N_\varepsilon(p)|\ge \text{minPts}" data-block></div>
+      <p class="fnote">Первая строка — это и есть <b>наш кружок</b>: ε-окрестность точки <i>p</i> — все точки <i>q</i>, что не дальше <b>ε</b> от неё (<span style="font-family:var(--mono,monospace)">‖p−q‖</span> — обычное расстояние). Вторая строка — правило компании: если внутри кружка набралось <b>minPts</b> соседей и больше, точка <i>p</i> — <b>ядро</b>. Не набралось, но рядом есть чьё-то ядро — <b>граница</b>; совсем никого — <b>шум</b>.</p>
+    </div>
+
+    <div class="intuition">
+      <div class="ftitle">Что видно и что покрутить</div>
+      <ul>
+        <li><b>Кружок и связи.</b> У текущей точки рисуется <b>ε-окрестность</b> и линии к соседям — это её <i>N<sub>ε</sub>(p)</i>. Залитая точка — <b>ядро</b>, полая в цвет — <b>граница</b>, серая — <b>шум</b>.</li>
+        <li><b>Двинь ε вправо.</b> Кружок крупнеет, соседей в нём больше — отдельные скопления сливаются в один кластер, шума почти не остаётся. Слишком большой ε — и вся площадь станет одной компанией.</li>
+        <li><b>Двинь minPts вверх.</b> Планка «сколько нужно соседей для ядра» растёт — стать ядром тяжелее, разреженные края осыпаются в <b>шум</b>, кластеры мельчают.</li>
+        <li><b>Кликни по полю.</b> Добавь точку в пустоту — она останется шумом; добавь в гущу — подсветится как ядро или граница.</li>
+      </ul>
     </div>
 
     <div class="lab-grid">
@@ -98,5 +134,6 @@
   <script src="../../assets/js/datasets.js"></script>
   <script src="dbscan.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

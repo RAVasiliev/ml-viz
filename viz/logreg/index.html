@@ -6,12 +6,43 @@
   <title>Логистическая регрессия — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
     /* две под-панели рядом: сигмоида + кривая лог-лосса */
     .sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
     @media (max-width: 560px) { .sub-grid { grid-template-columns: 1fr; } }
     .sub-host { height: 168px; }
+
+    /* вводный текст с душой */
+    .lead { font-size:15.5px; line-height:1.6; color:var(--muted); max-width:780px; }
+    .lead b { color:var(--ink); }
+
+    /* блок формул KaTeX */
+    .formula-card { background:var(--surface); border:1px solid var(--line); border-radius:14px;
+      padding:16px 18px; margin-top:18px; box-shadow:var(--shadow-sm); max-width:780px; }
+    .formula-card .ftitle { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+      color:var(--faint); margin-bottom:6px; }
+    .frow { display:grid; grid-template-columns:auto 1fr; gap:12px 16px; align-items:center; }
+    @media (max-width:560px){ .frow { grid-template-columns:1fr; gap:4px 0; } }
+    .frow .kf { margin:6px 0; }
+    .frow .fgloss { font-size:13px; line-height:1.5; color:var(--muted); }
+    .frow .fgloss b { color:var(--ink); }
+    .kf { margin:8px 0; overflow-x:auto; overflow-y:hidden; }
+    .katex { font-size:1.05em; }
+
+    /* панель интуиции */
+    .intuition { background:#fffbeb; border:1px solid #fde68a; border-radius:14px;
+      padding:14px 18px 6px; margin-top:18px; max-width:780px; }
+    .intuition .ititle { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+      color:#92400e; margin-bottom:8px; }
+    .intuition ul { margin:0 0 8px; padding-left:0; list-style:none; }
+    .intuition li { font-size:14px; line-height:1.55; color:#713f12; margin-bottom:9px; padding-left:24px; position:relative; }
+    .intuition li::before { content:"→"; position:absolute; left:4px; top:0; color:#b45309; font-weight:700; }
+    .intuition li b { color:#92400e; }
+    .intuition .tag { display:inline-block; font-family:var(--mono); font-size:12px; font-weight:650;
+      background:#fef3c7; color:#92400e; border:1px solid #fcd34d; border-radius:6px; padding:0 6px; }
   </style>
 </head>
 <body>
@@ -29,7 +60,31 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Линейные · Логистическая регрессия</div>
       <h1>Логистическая регрессия</h1>
-      <p>Модель предсказывает <b>вероятность</b> класса 1 через сигмоиду от линейной комбинации признаков: <b>p(x)=σ(w·φ(x)+b)</b>. Веса подбираются <b>градиентным спуском</b> по <b>лог-лоссу</b> (кросс-энтропия = −лог-правдоподобие). Заливка фона — вероятность p от класса 0 к классу 1, белый контур — граница <b>p=0.5</b>. Степень φ=2 добавляет признаки x², xy, y² — граница искривляется и берёт «Кольца»/XOR.</p>
+      <p class="lead">Письмо пришло — <b>спам или нет?</b> Клиент банка — <b>уйдёт или останется?</b> Честный ответ тут не «да/нет», а <b>насколько вероятно</b>: «спам на 92%», «уйдёт на 30%». Логистическая регрессия и выдаёт это число — вероятность класса 1. Сначала она складывает признаки в одно число <b>z = w·φ(x)+b</b> (отступ — насколько уверенно объект «за» класс 1), а потом продавливает его через <b>сигмоиду σ</b> в коридор (0, 1). Учится, подбирая веса <b>w</b> так, чтобы <b>лог-лосс</b> был минимален — то есть чтобы за уверенные предсказания, попавшие <b>мимо</b>, платить дороже всего. На карте: <b>заливка фона</b> — это сама вероятность p(x), от синего (0) к красному (1), а <b>белый контур</b> — линия сомнения <b>p = 0.5</b>, где модель не знает ответа. Двинь <span class="tag">φ</span> на 2 — добавятся признаки x², xy, y², и прямая линия согнётся в дугу, разделяющую «Кольца» и XOR.</p>
+
+      <div class="formula-card">
+        <div class="ftitle">Что считает модель</div>
+        <div class="frow">
+          <div class="kf" data-tex="\sigma(z)=\dfrac{1}{1+e^{-z}}" data-block></div>
+          <div class="fgloss"><b>Сигмоида.</b> Берёт любое z (от −∞ до +∞) и мягко сжимает в (0, 1). Большое z → почти 1, около нуля → ≈0.5, сильно отрицательное → почти 0. Это её график на нижней левой панели.</div>
+
+          <div class="kf" data-tex="p=\sigma(w^{\top}x+b)" data-block></div>
+          <div class="fgloss"><b>Вероятность класса 1.</b> Сначала линейная комбинация признаков <b>z = w·x+b</b> (тот самый отступ), затем сигмоида превращает его в вероятность <b>p</b>. Граница <b>p = 0.5</b> — это ровно <b>z = 0</b>, белая линия на карте.</div>
+
+          <div class="kf" data-tex="\mathcal{L}=-\frac1n\sum_i\big[y_i\log p_i+(1-y_i)\log(1-p_i)\big]" data-block></div>
+          <div class="fgloss"><b>Лог-лосс</b> (он же кросс-энтропия = −лог-правдоподобие). Для объекта класса 1 платим −log p, для класса 0 — −log(1−p). Уверенная ошибка (p≈0, а ответ 1) даёт огромный штраф. Градиентный спуск двигает <b>w</b> вниз по этой кривой — её падение видно на нижней правой панели.</div>
+        </div>
+      </div>
+
+      <div class="intuition">
+        <div class="ititle">Что покрутить и на что смотреть</div>
+        <ul>
+          <li>Жми <span class="tag">Запуск</span> — справа внизу <b>лог-лосс L</b> поползёт вниз, а на карте заливка вероятности «разъедется» к двум полюсам и граница <b>p = 0.5</b> ляжет между классами. Обведённые точки — ошибки при пороге 0.5; их станет меньше.</li>
+          <li>Двинь <span class="tag">φ</span> с 1 на 2: при φ=1 граница — прямая (гиперплоскость <b>z = 0</b>), при φ=2 появляются x², xy, y² и она гнётся в кривую. На «Кольцах» прямая бессильна, а дуга обнимает внутренний класс.</li>
+          <li>Увеличивай <span class="tag">learning rate η</span> — обучение ускоряется, но при большом η кривая лог-лосса начинает «прыгать», а не плавно падать: шаг градиента перелетает минимум.</li>
+          <li>Добавь <span class="tag">L2 λ</span> — штраф ‖w‖² тянет веса к нулю: смотри на <b>‖w‖</b> в счётчиках (падает) и на сигмоиду слева — красная отметка <b>среднего отступа</b> уезжает к центру, модель становится <b>менее</b> уверенной, но граница — глаже и устойчивее к переобучению.</li>
+        </ul>
+      </div>
     </div>
 
     <div class="lab-grid">
@@ -111,5 +166,6 @@
   <script src="../../assets/js/datasets-labeled.js"></script>
   <script src="logreg.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

@@ -223,18 +223,22 @@
         const ang = r() * Math.PI, sa = 0.24 + 0.30 * r(), sb = 0.9 + 1.2 * r();
         const sign = r() < 0.72 ? -1 : 1, a = sign * (0.7 + 1.6 * r());
         comps.push({ t: "ridge", cx, cy, c: Math.cos(ang), s: Math.sin(ang), sa2: sa * sa, sb2: sb * sb, a });
+      } else if (style === "dunes") {
+        const ax = (0.55 + 1.25 * r()) * (r() < 0.5 ? -1 : 1), ay = (0.55 + 1.25 * r()) * (r() < 0.5 ? -1 : 1);
+        comps.push({ t: "dune", ax, ay, A: 0.5 + 1.0 * r(), ph: r() * 6.2832 });
       } else {
         const s = 0.42 + 0.95 * r(), sign = r() < 0.62 ? -1 : 1, a = sign * (0.6 + 1.9 * r());
         comps.push({ t: "gauss", cx, cy, s2: s * s, a });
       }
     }
-    const b = style === "craters" ? 0.05 : style === "ridges" ? 0.06 : 0.08;
+    const b = style === "craters" ? 0.05 : style === "ridges" ? 0.06 : style === "dunes" ? 0.07 : 0.08;
     const L = (u, v) => {
       let s = 0.5 * b * (u * u + v * v);
       for (const c of comps) {
         const dx = u - c.cx, dy = v - c.cy, q = dx * dx + dy * dy;
         if (c.t === "crater") s += -c.A * Math.exp(-q / (2 * c.s1)) + 0.55 * c.A * Math.exp(-q / (2 * c.s2));
         else if (c.t === "ridge") { const lx = dx * c.c + dy * c.s, ly = -dx * c.s + dy * c.c; s += c.a * Math.exp(-(lx * lx / (2 * c.sa2) + ly * ly / (2 * c.sb2))); }
+        else if (c.t === "dune") s += c.A * Math.sin(c.ax * u + c.ay * v + c.ph);
         else s += c.a * Math.exp(-q / (2 * c.s2));
       }
       return s;
@@ -251,13 +255,16 @@
           const e = c.a * Math.exp(-(lx * lx / (2 * c.sa2) + ly * ly / (2 * c.sb2)));
           const dlx = -lx / c.sa2, dly = -ly / c.sb2;
           gu += e * (dlx * c.c + dly * (-c.s)); gv += e * (dlx * c.s + dly * c.c);
+        } else if (c.t === "dune") {
+          const cc = c.A * Math.cos(c.ax * u + c.ay * v + c.ph);
+          gu += cc * c.ax; gv += cc * c.ay;
         } else {
           const e = c.a * Math.exp(-q / (2 * c.s2)); gu += e * (-dx / c.s2); gv += e * (-dy / c.s2);
         }
       }
       return [gu, gv];
     };
-    const styleName = { mixed: "ямы и холмы", craters: "кратеры с валом", ridges: "хребты и каньоны" }[style] || style;
+    const styleName = { mixed: "ямы и холмы", craters: "кратеры с валом", ridges: "хребты и каньоны", dunes: "плавные дюны" }[style] || style;
     return bake({ id: "terrain", name: "Случайный рельеф", isTerrain: true, seed, bumps: K, style, L, grad, domain: dom, lr0: 0.06,
       formula: "L = ½·b(x²+y²) + Σ компонент · стиль: " + style,
       note: "Процедурный ландшафт (" + styleName + "). Тыкай готовые рельефы или жми «Сгенерировать новый». Спуск остановится у глобального минимума; шум (SGD) помогает выбраться из локальной ямы." });
@@ -282,12 +289,14 @@
 
   // Предрассчитанные «интересные» рельефы разных стилей — их тыкают чипами в UI.
   const TERRAIN_PRESETS = [
-    { seed: 0x51a7, bumps: 9, style: "mixed" }, { seed: 0x8c12, bumps: 11, style: "mixed" },
-    { seed: 0x2f9b, bumps: 7, style: "craters" }, { seed: 0xb3d4, bumps: 6, style: "craters" },
-    { seed: 0x77e1, bumps: 7, style: "ridges" }, { seed: 0x1a55, bumps: 8, style: "ridges" },
-    { seed: 0xd0c3, bumps: 12, style: "mixed" }, { seed: 0x4e88, bumps: 9, style: "craters" },
-    { seed: 0x33f0, bumps: 8, style: "ridges" }, { seed: 0xa1b2, bumps: 10, style: "mixed" },
-    { seed: 0x6c4e, bumps: 6, style: "craters" }, { seed: 0x9d70, bumps: 9, style: "ridges" },
+    { seed: 0x51a7, bumps: 9, style: "mixed", name: "Холмы и ямы" },
+    { seed: 0xd0c3, bumps: 11, style: "mixed", name: "Архипелаг" },
+    { seed: 0x2f9b, bumps: 7, style: "craters", name: "Кратеры" },
+    { seed: 0x4e88, bumps: 6, style: "craters", name: "Метеоритное поле" },
+    { seed: 0x77e1, bumps: 7, style: "ridges", name: "Хребты" },
+    { seed: 0x9d70, bumps: 8, style: "ridges", name: "Каньоны" },
+    { seed: 0x4f2c, bumps: 6, style: "dunes", name: "Дюны" },
+    { seed: 0x2bd8, bumps: 6, style: "dunes", name: "Барханы" },
   ];
 
   // В списке функций — только «интересные»: рельеф (по умолчанию первый пресет),

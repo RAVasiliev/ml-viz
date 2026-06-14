@@ -6,7 +6,30 @@
   <title>Random Forest — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
+  <style>
+    .lead { font-size:15.5px; line-height:1.6; color:var(--muted); max-width:780px; }
+    .lead b { color:var(--ink); }
+    .teach { display:grid; grid-template-columns:1.05fr 1fr; gap:16px; margin-top:16px; max-width:880px; }
+    @media (max-width:760px){ .teach { grid-template-columns:1fr; } }
+    .teach-card { background:var(--surface); border:1px solid var(--line); border-radius:12px;
+      padding:14px 16px; box-shadow:var(--shadow-sm); }
+    .teach-card h3 { font-size:12px; font-weight:650; letter-spacing:.03em; text-transform:uppercase;
+      color:var(--faint); margin:0 0 10px; }
+    .kf { margin:8px 0; overflow-x:auto; overflow-y:hidden; }
+    .katex { font-size:1.05em; }
+    .kf-note { font-size:13px; line-height:1.5; color:var(--muted); margin:3px 0 12px; }
+    .kf-note b { color:var(--ink); }
+    .kf-note:last-child { margin-bottom:2px; }
+    .teach ul { margin:0; padding-left:18px; }
+    .teach li { font-size:13.5px; line-height:1.55; color:var(--muted); margin-bottom:8px; }
+    .teach li:last-child { margin-bottom:0; }
+    .teach li b { color:var(--ink); }
+    .teach code { font-family:var(--mono); font-size:12.5px; background:var(--surface-2);
+      border:1px solid var(--line); border-radius:5px; padding:0 5px; color:var(--ink); }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -23,7 +46,26 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Деревья · Random Forest</div>
       <h1>Random Forest — случайный лес</h1>
-      <p>Каждое дерево учится на своей <b>bootstrap-выборке</b> и при каждом сплите выбирает из случайного подмножества признаков (<b>max_features</b>). Ответ ансамбля — голосование деревьев. Одиночное дерево даёт «зубчатую» границу (справа снизу), а усреднение десятков таких — <b>гладкую и устойчивую</b> (слева). Это снижение дисперсии: Var ≈ ρσ² + (1−ρ)σ²/M.</p>
+      <p class="lead">Спросить одного эксперта рискованно: он умён, но <b>упрям в своих ошибках</b> — на чуть других данных ответил бы иначе. Поэтому соберём <b>зал из сотни экспертов</b> и проголосуем. Чтобы голоса были честными, каждого учим по-своему: он видит <b>свою случайную подвыборку объектов</b> (bootstrap — берём с возвращением, часть данных он вообще не увидит) и на каждом вопросе-сплите смотрит лишь на <b>случайную горстку признаков</b> (<code>max_features</code>). Эксперты выходят <b>разными</b> и ошибаются по-разному — а в зале их промахи гасят друг друга. Один эксперт — это «зубчатая» осевая граница (панель справа снизу); зал из десятков таких голосует — и граница становится <b>гладкой и устойчивой</b> (слева). Так лес сбивает не смещение, а <b>дисперсию</b>: ответ перестаёт прыгать от случайности данных.</p>
+
+      <div class="teach">
+        <div class="teach-card">
+          <h3>Формулы курса</h3>
+          <div class="kf" data-tex="a(x)=\frac1M\sum_{m=1}^{M} b_m(x)\ \ (\text{или мода})" data-block></div>
+          <div class="kf-note"><b>Голос ансамбля.</b> Берём ответы <b>M</b> деревьев <i>b<sub>m</sub>(x)</i> и усредняем (для чисел — регрессия) либо выбираем самый частый класс — <b>моду</b> (классификация, как здесь, см. цвет фона). Один голос слаб, среднее многих — устойчиво.</div>
+          <div class="kf" data-tex="\mathrm{Var}[a(x)]=\rho\sigma^2+\frac{1-\rho}{M}\sigma^2" data-block></div>
+          <div class="kf-note"><b>Откуда устойчивость.</b> <i>σ²</i> — «разброс» одного дерева, <i>M</i> — сколько их, <i>ρ</i> — насколько деревья <b>похожи</b> (коррелируют). Второе слагаемое тает с ростом <i>M</i> → ползунок «Деревьев» гасит разброс. А первое <i>ρσ²</i> остаётся <b>навсегда</b>: при <i>M→∞</i> разброс упирается в <i>ρσ²</i> — вот зачем деревья делают разными (меньше <i>ρ</i> → ниже пол).</div>
+        </div>
+        <div class="teach-card">
+          <h3>Что видно · что покрутить</h3>
+          <ul>
+            <li><b>«Деревьев» с 1 до 120.</b> Сначала граница нервно дёргается с каждым деревом, потом застывает — это слагаемое <code>(1−ρ)σ²/M → 0</code>. Прирост выходит на <b>плато</b>: 100-й эксперт уже мало что меняет.</li>
+            <li><b>«max_features»: 1 против 2.</b> Поставь <code>1</code> (как эвристика <i>k=⌊√p⌋</i>) — деревья смотрят на разные признаки, выходят разнообразнее, <b>ρ падает</b>, фон-голос ровнее. Поставь <code>2</code> — это уже обычный bagging, деревья похожи, <i>ρ</i> выше.</li>
+            <li><b>«Глубина дерева».</b> Глубокое дерево почти не смещено, но очень волатильно (большое <i>σ²</i>) — идеальная пища для леса: смотри, как зал гасит его дёрганье в гладкий фон.</li>
+            <li><b>Панель «последнее дерево».</b> Её резкая ступенчатая граница — это один <i>b<sub>m</sub>(x)</i>. Сравни с гладким лесом слева: усреднение моды и есть <b>a(x)</b>.</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div class="lab-grid">
@@ -100,5 +142,6 @@
   <script src="../../assets/js/tree-core.js"></script>
   <script src="forest.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>
