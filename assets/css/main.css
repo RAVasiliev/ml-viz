@@ -188,6 +188,12 @@ a { color: inherit; text-decoration: none; }
   font-size: 13px;
 }
 .site-footer a { color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.site-footer .foot p { margin: 0 0 7px; line-height: 1.55; }
+.site-footer .foot p:last-child { margin-bottom: 0; }
+.site-footer .foot-author { color: var(--muted); font-size: 14px; }
+.site-footer .foot-author b { color: var(--ink); }
+.site-footer .foot a.tg { color: var(--accent); font-weight: 600; text-decoration: none; }
+.site-footer .foot a.tg:hover { text-decoration: underline; }
 
 @media (max-width: 560px) {
   .hero { padding: 40px 0 18px; }
