@@ -80,10 +80,35 @@
     sr.innerHTML = `<td class="obj">Σ штрафов (÷${PPL.length})</td><td></td><td></td><td class="pen-c">${fmt(sum)}</td>`;
     tb.appendChild(sr);
   }
+  function worstIndex() { let w = 0; PPL.forEach((d, i) => { if (loss(d) > loss(PPL[w])) w = i; }); return w; }
+  // разбор одного пациента: какое из двух слагаемых живёт (×1), а какое гаснет (×0)
+  function renderBreakdown(i) {
+    if (i < 0 || i >= PPL.length) i = worstIndex();
+    const d = PPL[i], p = d.p, L = loss(d), grey = "\\textcolor{#c3c9d4}";
+    const who = $("#bdWho");
+    who.textContent = `№${i + 1} · ${d.sick ? "болен (y = 1)" : "здоров (y = 0)"}`;
+    who.className = "who " + (d.sick ? "s" : "h");
+    let tex;
+    if (d.sick) {
+      tex = `-\\big[\\,\\textcolor{#ef4444}{1\\cdot\\ln p} \\;+\\; ${grey}{0\\cdot\\ln(1-p)}\\,\\big]` +
+            ` = -\\ln p = -\\ln(${p.toFixed(2)}) = \\htmlClass{kres}{${fmt(L)}}`;
+      $("#bdHint").innerHTML = 'y = 1 → живёт только <b class="sick">−ln p̂</b>; второй член умножается на 0 и исчезает.';
+    } else {
+      tex = `-\\big[\\,${grey}{0\\cdot\\ln p} \\;+\\; \\textcolor{#10b981}{1\\cdot\\ln(1-p)}\\,\\big]` +
+            ` = -\\ln(1-p) = -\\ln(${(1 - p).toFixed(2)}) = \\htmlClass{kres}{${fmt(L)}}`;
+      $("#bdHint").innerHTML = 'y = 0 → живёт только <b class="healthy">−ln(1−p̂)</b>; первый член умножается на 0 и исчезает.';
+    }
+    $("#bdMath").innerHTML = KT(tex);
+  }
+
   function renderTotal() {
-    const terms = PPL.map((d, i) => `\\htmlClass{term term-${i} llpen}{${fmt(loss(d))}}`).join("+");
+    const terms = PPL.map((d, i) => {
+      const col = d.sick ? "#ef4444" : "#10b981";
+      return `\\htmlClass{term term-${i}}{\\textcolor{${col}}{${fmt(loss(d))}}}`;
+    }).join("+");
     const tex = `\\mathrm{LogLoss}=\\dfrac{${terms}}{${PPL.length}}\\approx \\htmlClass{llres}{${fmt(total())}}`;
     $("#totalEq").innerHTML = KT(tex);
+    renderBreakdown(effIndex());
     termEls = [];
     PPL.forEach((d, i) => {
       const els = [...document.querySelectorAll(`#totalEq .term-${i}`)];
@@ -116,6 +141,7 @@
         (termEls[idx] || []).forEach((e) => e.classList.toggle("hl", add));
       };
       tog(state.shown, false); state.shown = i; tog(i, true);
+      renderBreakdown(i >= 0 ? i : worstIndex());
     }
     draw();
   }
@@ -159,11 +185,22 @@
     for (const t of [0, 0.25, 0.5, 0.75, 1]) ctx.fillText(t.toFixed(2), px(t), base + 6);
     ctx.fillText("вероятность p̂, что человек болен (мнение модели)", pl.x + pl.w / 2, base + 24);
 
+    // референс «чистого сомнения»: p̂=0.5 → −ln(0.5)=ln2≈0.69
+    const yDoubt = py(Math.LN2);
+    ctx.strokeStyle = "rgba(124,58,237,.22)"; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(pl.x, yDoubt); ctx.lineTo(pl.x + pl.w, yDoubt); ctx.stroke(); ctx.setLineDash([]);
+
     lossCurve(true); lossCurve(false);
-    // подписи кривых
-    ctx.font = "700 12px -apple-system, sans-serif"; ctx.textBaseline = "alphabetic";
-    ctx.fillStyle = SICK; ctx.textAlign = "left"; ctx.fillText("болен (y=1): −log p̂", px(0.52), py(-Math.log(0.52)) - 8);
-    ctx.fillStyle = HEALTHY; ctx.textAlign = "right"; ctx.fillText("здоров (y=0): −log(1−p̂)", px(0.48), py(-Math.log(1 - 0.48)) - 8);
+
+    // подписи кривых — по краям, каждая на своей крутой ветви, без наложения
+    ctx.font = "700 12.5px -apple-system, sans-serif"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = SICK; ctx.textAlign = "left";
+    ctx.fillText("болен (y=1): −ln p̂", px(0.085), py(-Math.log(0.085)) - 7);
+    ctx.fillStyle = HEALTHY; ctx.textAlign = "right";
+    ctx.fillText("здоров (y=0): −ln(1−p̂)", px(0.915), py(-Math.log(1 - 0.915)) - 7);
+    // подпись линии сомнения
+    ctx.fillStyle = "#7c3aed"; ctx.font = "11px -apple-system, sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "bottom";
+    ctx.fillText("p̂ = 0.5 → штраф 0.69", pl.x + pl.w - 4, yDoubt - 3);
 
     // точки-пациенты на своих кривых
     const hi = effIndex();

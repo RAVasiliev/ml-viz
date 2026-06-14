@@ -9,7 +9,7 @@
   const GUESS_C = "#0ea5e9", REAL_C = "#334155";
   const $ = (s) => document.querySelector(s);
 
-  const state = { n: 8, seed: 7, quality: 0.4, view: "bars", dropOut: false, hover: -1, pinned: -1, shown: -1 };
+  const state = { n: 8, seed: 7, quality: 0.4, view: "bars", dropOut: false, hover: -1, pinned: -1, shown: -1, czoom: 1 };
   let DATA = [];     // [{i,g,y,e,ae,se}]
   let OUT = -1;      // индекс грубого промаха
 
@@ -229,6 +229,22 @@
   const cCanvas = $("#curves"), cctx = cCanvas ? cCanvas.getContext("2d") : null;
   let CW = 0, CH = 0, curveGeom = null;
   function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  // «красивый» шаг сетки (1, 2, 5 × 10ⁿ) — оси остаются читаемыми при любом зуме
+  function niceStep(raw) { if (!(raw > 0)) return 1; const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; const n = f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10; return n * p; }
+  function fmtAxis(v) { const a = Math.abs(v); if (a < 1e-9) return "0"; return (a < 10 && Math.abs(v - Math.round(v)) > 1e-9) ? String(Math.round(v * 10) / 10) : String(Math.round(v)); }
+  // аккуратная типографика подписей кривых на canvas: |e| с прямыми модульными чертами и наклонным e
+  function absELabel(c, x, y, color) {
+    c.fillStyle = color; c.textBaseline = "middle"; c.textAlign = "left";
+    c.font = "600 15px Georgia, 'Times New Roman', serif"; c.fillText("|", x, y); const w1 = c.measureText("|").width;
+    c.font = "italic 600 15px Georgia, 'Times New Roman', serif"; c.fillText("e", x + w1, y); const w2 = c.measureText("e").width;
+    c.font = "600 15px Georgia, 'Times New Roman', serif"; c.fillText("|", x + w1 + w2, y);
+  }
+  // e² с настоящим приподнятым показателем (а не «e2»)
+  function eSqLabel(c, x, y, color) {
+    c.fillStyle = color; c.textBaseline = "middle"; c.textAlign = "left";
+    c.font = "italic 600 15px Georgia, 'Times New Roman', serif"; c.fillText("e", x, y); const w = c.measureText("e").width;
+    c.font = "600 10px Georgia, 'Times New Roman', serif"; c.fillText("2", x + w + 1, y - 6);
+  }
   function resizeCurves() {
     if (!cCanvas) return;
     const r = cCanvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
@@ -238,42 +254,56 @@
   function drawCurves() {
     if (!cctx || !CW) return;
     cctx.clearRect(0, 0, CW, CH);
-    const pad = { l: 46, r: 18, t: 18, b: 38 };
+    const pad = { l: 48, r: 18, t: 18, b: 38 };
     const x0 = pad.l, y0 = pad.t, pw = CW - pad.l - pad.r, ph = CH - pad.t - pad.b;
     const pts = active();
-    const E = Math.max(4, ...pts.map((d) => d.ae)), ymax = E * E;
+    const E0 = Math.max(4, ...pts.map((d) => d.ae));     // базовый размах по данным
+    const E = Math.max(1, E0 / state.czoom);             // зум: >1 приближает (диапазон уже)
+    const ymax = E * E;
     const PX = (e) => x0 + (e + E) / (2 * E) * pw, PY = (y) => y0 + ph - Math.min(y, ymax) / ymax * ph;
     curveGeom = { x0, pw, E };
-    // ось Y + горизонтальная сетка
+    // ось Y (штраф L) + горизонтальная сетка с «красивым» шагом
+    const ystep = niceStep(ymax / 4);
     cctx.font = "11px -apple-system, system-ui, sans-serif";
     cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
-    for (let k = 0; k <= 4; k++) { const yy = ymax * k / 4, Y = PY(yy); cctx.strokeStyle = "rgba(20,23,28,.06)"; cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(Math.round(yy) + "", x0 - 7, Y); }
-    // ось X (ошибка e со знаком, от −E до +E)
+    for (let y = 0; y <= ymax + 1e-6; y += ystep) { const Y = PY(y); cctx.strokeStyle = "rgba(20,23,28,.06)"; cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(fmtAxis(y), x0 - 7, Y); }
+    // ось X (ошибка e со знаком) с «красивым» шагом
+    const xstep = niceStep(2 * E / 10);
     cctx.textAlign = "center"; cctx.textBaseline = "alphabetic";
-    for (let e = -E; e <= E; e++) { const X = PX(e); cctx.strokeStyle = e === 0 ? "rgba(20,23,28,.18)" : "rgba(20,23,28,.05)"; cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.fillStyle = "#8a93a3"; cctx.fillText((e > 0 ? "+" + e : e) + "", X, y0 + ph + 16); }
+    for (let e = Math.ceil(-E / xstep) * xstep; e <= E + 1e-6; e += xstep) { const X = PX(e); const zero = Math.abs(e) < 1e-9; cctx.strokeStyle = zero ? "rgba(20,23,28,.18)" : "rgba(20,23,28,.05)"; cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.fillStyle = "#8a93a3"; cctx.fillText((e > 1e-9 ? "+" : "") + fmtAxis(e), X, y0 + ph + 16); }
     cctx.fillText("ошибка  e = y − ŷ", x0 + pw / 2, y0 + ph + 31);
     cctx.save(); cctx.translate(13, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("штраф  L(e)", 0, 0); cctx.restore();
     // функции потерь: L(e)=|e| (галочка) и L(e)=e² (парабола)
-    const curve = (fn, color) => { cctx.strokeStyle = color; cctx.lineWidth = 2.8; cctx.beginPath(); for (let s = 0; s <= 200; s++) { const e = -E + 2 * E * s / 200, X = PX(e), Y = PY(fn(e)); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); };
+    const curve = (fn, color) => { cctx.strokeStyle = color; cctx.lineWidth = 2.8; cctx.beginPath(); for (let s = 0; s <= 240; s++) { const e = -E + 2 * E * s / 240, X = PX(e), Y = PY(fn(e)); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); };
     curve((e) => e * e, "#4f46e5");
     curve((e) => Math.abs(e), "#10b981");
-    // подписи кривых
-    cctx.font = "italic 13px Georgia, serif"; cctx.textBaseline = "middle";
-    cctx.textAlign = "right"; cctx.fillStyle = "#10b981"; cctx.fillText("L = |e|", PX(E) - 4, PY(E) - 11);
-    cctx.textAlign = "left"; cctx.fillStyle = "#4f46e5"; cctx.fillText("L = e²", PX(-E) + 4, PY((0.84 * E) * (0.84 * E)));
-    // маркеры «типичной ошибки» MAE и RMSE на оси (RMSE ≥ MAE из-за выброса)
+    // аккуратные подписи кривых (без «L = …»)
+    absELabel(cctx, PX(0.9 * E) - 30, PY(0.9 * E) - 12, "#10b981");
+    eSqLabel(cctx, PX(-0.66 * E) + 6, PY((0.66 * E) * (0.66 * E)), "#4f46e5");
+    // три метрики: MAE и MSE — средние высоты штрафа; RMSE — синяя высота, спроецированная на ось ошибок
     const mm = metrics();
-    [[mm.mae, "#10b981", "MAE"], [mm.rmse, "#8b5cf6", "RMSE"]].forEach(([v, c, lbl]) => {
-      if (v > E) return;
-      const X = PX(v);
-      cctx.strokeStyle = c; cctx.lineWidth = 1.6; cctx.setLineDash([5, 4]);
-      cctx.beginPath(); cctx.moveTo(X, y0 + 14); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
-      cctx.fillStyle = c; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "top";
-      cctx.fillText(lbl, X, y0 + 1);
-    });
-    // наши квартиры — точки на обеих кривых при своей ошибке e
+    const dashH = (yval, color, label) => {
+      if (yval > ymax + 1e-9) return;
+      const Y = PY(yval);
+      cctx.strokeStyle = color; cctx.lineWidth = 1.4; cctx.setLineDash([5, 4]);
+      cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.setLineDash([]);
+      cctx.fillStyle = color; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "right"; cctx.textBaseline = "bottom";
+      cctx.fillText(label, x0 + pw - 3, Y - 2);
+    };
+    dashH(mm.mae, "#10b981", "MAE = " + fmt(mm.mae));
+    dashH(mm.mse, "#4f46e5", "MSE = " + fmt(mm.mse));
+    if (mm.rmse <= E) {                                   // RMSE: вертикаль от точки (RMSE, MSE) на параболе вниз к оси
+      const X = PX(mm.rmse), Ytop = PY(mm.mse), Ybot = PY(0);
+      cctx.strokeStyle = "#8b5cf6"; cctx.lineWidth = 1.6; cctx.setLineDash([5, 4]);
+      cctx.beginPath(); cctx.moveTo(X, Ytop); cctx.lineTo(X, Ybot); cctx.stroke(); cctx.setLineDash([]);
+      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(X, Ytop, 3.5, 0, 7); cctx.fill();
+      cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "bottom";
+      cctx.fillText("RMSE = " + fmt(mm.rmse), X, Ybot - 3);
+    }
+    // наши квартиры — точки на обеих кривых при своей ошибке e (вне видимого диапазона — пропускаем)
     const hi = effIndex();
     for (const d of pts) {
+      if (Math.abs(d.e) > E) continue;
       const X = PX(d.e), hot = d.i === hi;
       cctx.globalAlpha = hot ? 1 : 0.62;
       cctx.beginPath(); cctx.arc(X, PY(d.se), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#4f46e5"; cctx.fill();
@@ -281,7 +311,7 @@
       cctx.globalAlpha = 1;
       if (hot) {
         cctx.strokeStyle = "rgba(20,23,28,.3)"; cctx.setLineDash([4, 4]); cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
-        [["#4f46e5", d.se], ["#10b981", Math.abs(d.e)]].forEach(([c, v]) => { cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
+        [["#4f46e5", d.se], ["#10b981", Math.abs(d.e)]].forEach(([c, v]) => { if (v > ymax) return; cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
         const txt = "квартира №" + (d.i + 1) + ":  e = " + d.e + ",  |e| = " + d.ae + ",  e² = " + d.se;
         cctx.font = "700 11px -apple-system, sans-serif"; const tw = cctx.measureText(txt).width + 16;
         let tx = X + 10; if (tx + tw > CW - 4) tx = X - tw - 10;
@@ -293,7 +323,7 @@
     cctx.textAlign = "left"; cctx.textBaseline = "middle"; cctx.font = "12px -apple-system, sans-serif";
     let lx = x0 + 8; const ly = y0 + 11;
     const leg = (c, t) => { cctx.fillStyle = c; cctx.beginPath(); cctx.arc(lx + 5, ly, 5, 0, 7); cctx.fill(); cctx.fillStyle = "#14171c"; cctx.fillText(t, lx + 14, ly); lx += 14 + cctx.measureText(t).width + 16; };
-    leg("#10b981", "|e| → MAE"); leg("#4f46e5", "e² → MSE");
+    leg("#10b981", "|e| → MAE"); leg("#4f46e5", "e² → MSE"); leg("#8b5cf6", "√MSE → RMSE");
   }
   function nearestCurve(mx) {
     if (!curveGeom) return -1;
@@ -333,6 +363,14 @@
     state.quality = +e.target.value / 100;
     state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
+  // зум графика потерь: кнопки − / 1:1 / + и колесо мыши над холстом
+  const setZoom = (z) => { state.czoom = Math.min(8, Math.max(0.25, z)); drawCurves(); };
+  const zseg = $("#zoomSeg");
+  if (zseg) zseg.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const z = b.dataset.zoom;
+    setZoom(z === "in" ? state.czoom * 1.4 : z === "out" ? state.czoom / 1.4 : 1);
+  }));
+  if (cCanvas) cCanvas.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(state.czoom * (e.deltaY < 0 ? 1.18 : 1 / 1.18)); }, { passive: false });
   window.addEventListener("resize", () => { resize(); resizeCurves(); });
 
   // ---------- старт ----------
