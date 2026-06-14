@@ -329,7 +329,7 @@
     };
     vlabel("MAE " + A.eq + " " + A.s + " млн ₽", PX(mm.mae), 0, "#10b981");
     vlabel("RMSE = √MSE ≈ " + R.s + " млн ₽", PX(mm.rmse), 1, "#8b5cf6");
-    // ── ховер «в любом месте»: вертикаль под курсором + точки на обеих кривых + тултип у курсора ──
+    // ── ховер: вертикаль под курсором + точки на кривых + ПАНЕЛЬ С ТРЕМЯ МЕТРИКАМИ ──
     if (hoverE != null) {
       const e = Math.max(-E, Math.min(E, hoverE)), ae = Math.abs(e), se = e * e, X = PX(e);
       cctx.strokeStyle = "rgba(20,23,28,.38)"; cctx.lineWidth = 1.2; cctx.setLineDash([4, 4]);
@@ -339,18 +339,20 @@
         cctx.beginPath(); cctx.arc(X, PY(v), 5.5, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke();
       };
       dot(se, "#4f46e5"); dot(ae, "#10b981");
-      const t1 = "ошибка e = " + (e > 0 ? "+" : "") + (Math.round(e * 10) / 10) + " млн ₽";
-      const tG = "|e| = " + (Math.round(ae * 10) / 10), tB = "e² = " + (Math.round(se * 10) / 10);
-      cctx.font = "700 12px -apple-system, sans-serif";
-      const tw = Math.max(cctx.measureText(t1).width, cctx.measureText(tG + "      " + tB).width) + 20, th = 44;
-      let tx = X + 14; if (tx + tw > CW - 4) tx = X - tw - 14; if (tx < 4) tx = 4;
-      let ty = (hoverPx ? hoverPx.y : y0 + 60) - th - 16; if (ty < y0 + 4) ty = (hoverPx ? hoverPx.y : y0) + 18;
-      if (ty + th > y0 + ph) ty = y0 + ph - th - 4;
-      cctx.fillStyle = "rgba(20,23,28,.93)"; roundRect(cctx, tx, ty, tw, th, 9); cctx.fill();
+      // панель: сверху — вклад этой ошибки, ниже — все три итоговые метрики (их и хотим видеть)
+      const head = "ошибка e = " + (e > 0 ? "+" : "") + (Math.round(e * 10) / 10) + ":  |e| = " + (Math.round(ae * 10) / 10) + ",  e² = " + (Math.round(se * 10) / 10);
+      const rows = [["#34d399", "MAE " + A.eq + " " + A.s + " млн ₽"], ["#818cf8", "MSE " + S.eq + " " + S.s + " (млн ₽)²"], ["#c4b5fd", "RMSE = √MSE ≈ " + R.s + " млн ₽"]];
+      cctx.font = "600 11px -apple-system, sans-serif"; let tw = cctx.measureText(head).width;
+      cctx.font = "800 13px -apple-system, sans-serif"; rows.forEach((r) => tw = Math.max(tw, cctx.measureText(r[1]).width));
+      tw += 24; const th = 96;
+      let tx = X + 16; if (tx + tw > CW - 4) tx = X - tw - 16; if (tx < 4) tx = 4;
+      let ty = (hoverPx ? hoverPx.y - th / 2 : y0 + 8); if (ty < y0 + 4) ty = y0 + 4; if (ty + th > y0 + ph) ty = y0 + ph - th - 2;
+      cctx.fillStyle = "rgba(20,23,28,.95)"; roundRect(cctx, tx, ty, tw, th, 10); cctx.fill();
       cctx.textAlign = "left"; cctx.textBaseline = "top";
-      cctx.fillStyle = "#fff"; cctx.fillText(t1, tx + 10, ty + 8);
-      cctx.fillStyle = "#34d399"; cctx.fillText(tG, tx + 10, ty + 25);
-      cctx.fillStyle = "#a5b4fc"; cctx.fillText(tB, tx + 10 + cctx.measureText(tG + "      ").width, ty + 25);
+      cctx.font = "600 11px -apple-system, sans-serif"; cctx.fillStyle = "#cbd5e1"; cctx.fillText(head, tx + 12, ty + 10);
+      cctx.strokeStyle = "rgba(255,255,255,.14)"; cctx.lineWidth = 1; cctx.beginPath(); cctx.moveTo(tx + 12, ty + 29); cctx.lineTo(tx + tw - 12, ty + 29); cctx.stroke();
+      cctx.font = "800 13px -apple-system, sans-serif";
+      rows.forEach((r, k) => { cctx.fillStyle = r[0]; cctx.fillText(r[1], tx + 12, ty + 37 + k * 19); });
     }
   }
   // курсор → ближайшая квартира (для перекрёстной подсветки строки/формулы при наведении у точки)
