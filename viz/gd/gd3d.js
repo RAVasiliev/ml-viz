@@ -47,6 +47,16 @@
     return { sx: x1, sy: y1 * se - z * HS * ce, depth: y1 * ce + z * HS * se };
   }
 
+  function star(ctx, x, y, r, color) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rad = i % 2 ? r * 0.45 : r;
+      const px = x + Math.cos(a) * rad, py = y + Math.sin(a) * rad;
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath(); ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 1.4; ctx.strokeStyle = "#fff"; ctx.stroke();
+  }
+
   function render(ctx, grid, fn, tracks, cam, W, H) {
     const N = grid.N, L = grid.L, hd = grid.hd, d = grid.domain;
     const S = 0.40 * Math.min(W, H);
@@ -105,8 +115,8 @@
       }
       ctx.stroke(); ctx.globalAlpha = 1;
       const pl = path[path.length - 1], sl = scr(xnu(pl.u), xnv(pl.v), liftL(pl.u, pl.v));
-      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sl.X, sl.Y, many ? 3.2 : 5, 0, 7); ctx.fill();
-      ctx.strokeStyle = "#fff"; ctx.lineWidth = many ? 1.2 : 2; ctx.stroke();
+      if (tr.done) star(ctx, sl.X, sl.Y, many ? 6 : 9, col);
+      else { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(sl.X, sl.Y, many ? 3.2 : 5, 0, 7); ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = many ? 1.2 : 2; ctx.stroke(); }
     }
   }
 

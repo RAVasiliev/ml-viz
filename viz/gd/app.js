@@ -699,10 +699,9 @@
   regenBtn.addEventListener("click", newStart);
 
   document.querySelectorAll(".vtab").forEach((t) => t.addEventListener("click", () => setView(t.dataset.view)));
-  batchSel.addEventListener("change", () => { updateBatchUI(); rebuild(); });
+  batchSel.addEventListener("change", () => { updateAux(); rebuild(); });
   bsRange.addEventListener("input", () => { bsVal.textContent = bsRange.value; rebuild(); });
-  newTerrainBtn.addEventListener("click", regenTerrain);
-  bumpsRange.addEventListener("input", () => { terrainK = +bumpsRange.value; bumpsVal.textContent = terrainK; regenTerrain(); });
+  newTerrainBtn.addEventListener("click", regenRandom);
   multiChk.addEventListener("change", () => { multi = multiChk.checked; multiCountCtrl.style.display = multi ? "" : "none"; rebuild(); });
   multiCountRange.addEventListener("input", () => { multiCount = +multiCountRange.value; multiCountVal.textContent = multiCount; if (multi) rebuild(); });
 
@@ -746,12 +745,11 @@
   window.addEventListener("resize", resize);
 
   // ---- старт ----
-  fn = GD.funcs[funcSel.value];
+  fn = resolveFn();
   start = { u: fn.start.u, v: fn.start.v };
   betaCtrl.style.display = methodSel.value === "momentum" ? "" : "none";
   lrRange.value = lrToSlider(fn.lr0);
-  buildPresetChips();
-  updateBatchUI();
+  updateAux();
   syncFuncUI();
   syncLabels();
   setView("2d");

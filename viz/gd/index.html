@@ -50,6 +50,10 @@
     /* чекбокс */
     .chk { display: flex; align-items: center; gap: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink); cursor: pointer; }
     .chk input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
+    /* заголовок секции панели */
+    .psec { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      color: var(--faint); margin: 18px 2px 0; }
+    .panel .control:first-child { padding-top: 4px; }
   </style>
 </head>
 <body>
@@ -73,17 +77,13 @@
     <div class="lab-grid">
       <aside class="panel">
         <div class="control">
-          <label for="func">Функция потерь</label>
+          <label for="func">Фигура — рельеф</label>
           <select id="func"></select>
+          <button class="btn wide" id="newTerrain" style="margin-top:9px">🎲 Случайный рельеф</button>
           <div class="fn-note" id="funcNote"></div>
         </div>
 
-        <div class="control">
-          <label for="lr">Learning rate η <span class="val" id="lrVal">0.08</span></label>
-          <input type="range" id="lr" min="0" max="100" step="1" value="50" />
-          <div class="hint">Логарифмическая шкала. Малый η — медленно; большой — осцилляция/расходимость.</div>
-        </div>
-
+        <div class="psec">Спуск</div>
         <div class="control">
           <label for="method">Метод</label>
           <select id="method">
@@ -91,52 +91,45 @@
             <option value="momentum">momentum (импульс)</option>
           </select>
         </div>
-
         <div class="control" id="betaCtrl" style="display:none">
           <label for="beta">β (импульс) <span class="val" id="betaVal">0.90</span></label>
           <input type="range" id="beta" min="0" max="98" step="1" value="90" />
-          <div class="hint">Доля сохранённой скорости. Больше β — «тяжелее шар», дольше разгон и инерция.</div>
+          <div class="hint">Больше β — «тяжелее шар», дольше разгон и инерция.</div>
         </div>
-
-        <div class="control" id="batchCtrl" style="display:none">
-          <label for="batch">Режим градиента</label>
+        <div class="control">
+          <label for="lr">Шаг · learning rate η <span class="val" id="lrVal">0.08</span></label>
+          <input type="range" id="lr" min="0" max="100" step="1" value="50" />
+          <div class="hint">Малый η — медленно ползёт; большой — осцилляция и расходимость.</div>
+        </div>
+        <div class="control" id="batchCtrl">
+          <label for="batch">Градиент</label>
           <select id="batch">
-            <option value="full">Полный — точный градиент</option>
-            <option value="mini">Мини-батч</option>
-            <option value="sgd">Стохастический (макс. шум)</option>
+            <option value="full">полный — точный</option>
+            <option value="mini">мини-батч</option>
+            <option value="sgd">стохастический (шум)</option>
           </select>
-          <div class="hint">Меньше батч — шумнее шаг. На «Линейной регрессии» это реальная подвыборка данных; на остальных функциях — имитация шума стохастического градиента.</div>
+          <div class="hint">Меньше батч — шумнее шаг, легче выбраться из локальной ямы. На «Линейной регрессии» — реальная подвыборка данных.</div>
         </div>
         <div class="control" id="bsCtrl" style="display:none">
           <label for="batchSize">Размер батча <span class="val" id="batchSizeVal">8</span></label>
           <input type="range" id="batchSize" min="1" max="32" step="1" value="8" />
         </div>
 
-        <div class="control" id="terrainCtrl" style="display:none">
-          <label>Готовые рельефы — тыкай</label>
-          <div class="chip-row" id="presetChips"></div>
-          <div class="btn-row" style="padding-top:10px">
-            <button class="btn wide" id="newTerrain">🎲 Сгенерировать новый</button>
-          </div>
-          <label for="bumps" style="margin-top:12px">Сложность нового <span class="val" id="bumpsVal">9</span></label>
-          <input type="range" id="bumps" min="3" max="16" step="1" value="9" />
-          <div class="hint">Тыкай готовые ландшафты или сгенерируй случайный. Ищи глобальный минимум — и смотри, помогает ли шум (SGD) выбраться из ямы.</div>
-        </div>
-
+        <div class="psec">Мультистарт</div>
         <div class="control">
-          <label class="chk"><input type="checkbox" id="multi" /> Мультиспуск — из многих точек сразу</label>
+          <label class="chk"><input type="checkbox" id="multi" /> Запустить из многих точек сразу</label>
           <div id="multiCountCtrl" style="display:none;margin-top:10px">
             <label for="multiCount">Стартов <span class="val" id="multiCountVal">24</span></label>
             <input type="range" id="multiCount" min="4" max="60" step="1" value="24" />
           </div>
-          <div class="hint">Запускает много спусков сразу — видно бассейны притяжения: кто добежит до глобального минимума (🟢), а кто застрянет в локальной яме (🟠).</div>
+          <div class="hint">Видно бассейны притяжения: кто добежит до цели (🟢), кто застрянет в локальной яме (🟠). Остановился — ставит ★.</div>
         </div>
 
+        <div class="psec">Воспроизведение</div>
         <div class="control">
-          <label for="speed">Скорость анимации <span class="val" id="speedVal">35</span></label>
+          <label for="speed">Скорость <span class="val" id="speedVal">35</span></label>
           <input type="range" id="speed" min="1" max="100" step="1" value="35" />
         </div>
-
         <div class="control">
           <div class="btn-row">
             <button class="btn primary" id="play"></button>
@@ -183,9 +176,9 @@
           <div class="canvas-hint" id="hint">Клик по полю — задать стартовую точку</div>
         </div>
         <div class="legend">
-          <span><i class="dot" style="background:#4f46e5"></i> траектория спуска</span>
-          <span><i class="dot" style="background:#ef4444"></i> текущая точка</span>
-          <span><i class="dot" style="background:#10b981"></i> минимум функции</span>
+          <span><i class="dot" style="background:#4f46e5"></i> траектория</span>
+          <span><i class="dot" style="background:#10b981"></i> минимум-цель</span>
+          <span>★ остановился: <span style="color:#10b981">🟢 у цели</span> · <span style="color:#f59e0b">🟠 в яме</span></span>
           <span style="color:var(--faint)" id="legendNote">заливка + изолинии — рельеф L(x,y)</span>
         </div>
       </section>
