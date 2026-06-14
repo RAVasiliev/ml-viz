@@ -297,8 +297,11 @@
       cctx.strokeStyle = "#8b5cf6"; cctx.lineWidth = 1.6; cctx.setLineDash([5, 4]);
       cctx.beginPath(); cctx.moveTo(X, Ytop); cctx.lineTo(X, Ybot); cctx.stroke(); cctx.setLineDash([]);
       cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(X, Ytop, 3.5, 0, 7); cctx.fill();
-      cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "bottom";
-      cctx.fillText("RMSE = " + fmt(mm.rmse), X, Ybot - 3);
+      cctx.font = "700 11px -apple-system, sans-serif"; cctx.textBaseline = "middle";
+      const lbl = "RMSE = " + fmt(mm.rmse), lw = cctx.measureText(lbl).width;
+      let lxp = X + 7, align = "left";
+      if (lxp + lw > x0 + pw) { lxp = X - 7; align = "right"; }
+      cctx.textAlign = align; cctx.fillText(lbl, lxp, Ytop - 8);
     }
     // наши квартиры — точки на обеих кривых при своей ошибке e (вне видимого диапазона — пропускаем)
     const hi = effIndex();

@@ -29,7 +29,7 @@
     for (let i = 0; i < state.count; i++) {
       const sick = r() < 0.5;
       // вероятность, назначенная ИСТИННОМУ классу: хорошая модель → к 1, плохая → к 0 (уверенно неправа)
-      const pCorrect = clamp(0.93 - q * 0.9 + (r() - 0.5) * 0.16, 0.02, 0.98);
+      const pCorrect = clamp(0.88 - q * 0.78 + (r() - 0.5) * 0.62, 0.04, 0.96);
       const p = sick ? pCorrect : 1 - pCorrect;               // p = вероятность «болен»
       PPL.push({ sick, p });
     }

@@ -74,6 +74,7 @@
     .side { flex: 1; min-width: 188px; display: flex; flex-direction: column; gap: 12px; }
     .side .formula { font-family: var(--mono); font-size: 12px; color: var(--muted); }
     .side .legend { padding-top: 2px; }
+    .lab-head p { max-width: none; }   /* лид во всю ширину — без пустого места справа */
     @media (max-width: 1040px) {
       .play-area { flex-direction: column; }
       .play-area .canvas-host { width: 100%; height: auto; aspect-ratio: 1/1; max-width: 560px; }
@@ -105,7 +106,6 @@
           <label for="func">Фигура — рельеф</label>
           <select id="func"></select>
           <button class="btn wide" id="newTerrain" style="margin-top:9px">🎲 Случайный рельеф</button>
-          <div class="fn-note" id="funcNote"></div>
         </div>
 
         <div class="psec">Спуск</div>
@@ -124,16 +124,16 @@
         <div class="control">
           <label for="lr">Шаг · learning rate η <span class="val" id="lrVal">0.08</span></label>
           <input type="range" id="lr" min="0" max="100" step="1" value="50" />
-          <div class="hint">Малый η — медленно ползёт; большой — осцилляция и расходимость.</div>
+          <div class="hint">Длина шага в правиле θ ← θ − η·∇L. Управляет скоростью сходимости; при слишком большом η итерации расходятся.</div>
         </div>
         <div class="control" id="batchCtrl">
           <label for="batch">Градиент</label>
           <select id="batch">
-            <option value="full">полный — точный</option>
-            <option value="mini">мини-батч</option>
-            <option value="sgd">стохастический (шум)</option>
+            <option value="full">Full Gradient — по всем точкам</option>
+            <option value="sgd">SGD — по одной случайной</option>
+            <option value="mini">Mini-batch — по случайной части</option>
           </select>
-          <div class="hint">Меньше батч — шумнее шаг, легче выбраться из локальной ямы. На «Линейной регрессии» — реальная подвыборка данных.</div>
+          <div class="hint">Чем меньше выборка для градиента — тем шумнее шаг (и легче выскочить из локальной ямы). На «Линейной регрессии» это реальная подвыборка данных.</div>
         </div>
         <div class="control" id="bsCtrl" style="display:none">
           <label for="batchSize">Размер батча <span class="val" id="batchSizeVal">8</span></label>

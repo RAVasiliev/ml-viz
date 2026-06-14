@@ -10,7 +10,7 @@
 
   const canvas = $("canvas"), ctx = canvas.getContext("2d");
 
-  const funcSel = $("func"), funcNote = $("funcNote");
+  const funcSel = $("func");
   const lrRange = $("lr"), lrVal = $("lrVal");
   const methodSel = $("method");
   const betaCtrl = $("betaCtrl"), betaRange = $("beta"), betaVal = $("betaVal");
@@ -627,8 +627,7 @@
 
   /* ------------------------------ контролы ------------------------------ */
   function syncFuncUI() {
-    funcNote.textContent = fn.note;
-    formulaEl.textContent = fn.formula || FORMULA[fn.id] || "";
+    formulaEl.textContent = fn.isTerrain ? "" : (fn.formula || FORMULA[fn.id] || "");
   }
   function updateAux() {
     bsCtrl.style.display = batchSel.value === "mini" ? "" : "none";
