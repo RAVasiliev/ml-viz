@@ -267,27 +267,25 @@
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawCurves();
   }
   let hoverE = null, hoverPx = null;                      // ховер: ошибка под курсором и его пиксель
-  // Три кривые-метрики: двигаем ошибку e ОДНОГО объекта (самого крупного промаха),
-  // остальные объекты фиксированы (фон). Кривые — как от этого меняются метрики:
-  //   MAE(e) = (Σ|e| фон + |e|)/n   — линейная (галочка),
-  //   MSE(e) = (Σe² фон + e²)/n      — парабола, растёт быстрее → «наказывает сильнее»,
-  //   RMSE(e) = √MSE(e)              — корень, возвращает в млн ₽ (рядом с MAE).
-  // В точке e = (реальная ошибка объекта) кривые проходят через настоящие MAE/MSE/RMSE.
+  // Три кривые-метрики. Сценарий: модель точна, КРОМЕ одного объекта — у него ошибка e
+  // (ось X), остальные n−1 объектов идеальны (ошибка 0). Кривые — как от этого растут метрики:
+  //   MAE(e)  = |e|/n        — почти не реагирует: усреднение гасит одиночный промах,
+  //   MSE(e)  = e²/n         — парабола, растёт быстрее всех → «наказывает сильнее»,
+  //   RMSE(e) = √MSE = |e|/√n — корень MSE, между MAE и MSE.
+  // При e = 0 все метрики = 0 — кривые выходят из начала координат.
   function curveFns() {
-    const arr = active(), n = Math.max(1, arr.length);
-    let movI = 0; for (let i = 1; i < arr.length; i++) if (Math.abs(arr[i].e) > Math.abs(arr[movI].e)) movI = i;
-    const eMov = arr.length ? arr[movI].e : 0;
-    let Kae = 0, Kse = 0; arr.forEach((d, i) => { if (i !== movI) { Kae += d.ae; Kse += d.se; } });
-    const MAEf = (e) => (Kae + Math.abs(e)) / n, MSEf = (e) => (Kse + e * e) / n, RMSEf = (e) => Math.sqrt(MSEf(e));
-    return { eMov, MAEf, MSEf, RMSEf };
+    const n = Math.max(1, active().length);
+    const maxAE = active().reduce((m, d) => Math.max(m, d.ae), 0);
+    const MAEf = (e) => Math.abs(e) / n, MSEf = (e) => e * e / n, RMSEf = (e) => Math.sqrt(e * e / n);
+    return { maxAE, MAEf, MSEf, RMSEf };
   }
   function drawCurves() {
     if (!cctx || !CW) return;
     cctx.clearRect(0, 0, CW, CH);
     const pad = { l: 52, r: 18, t: 18, b: 40 };
     const x0 = pad.l, y0 = pad.t, pw = CW - pad.l - pad.r, ph = CH - pad.t - pad.b;
-    const { eMov, MAEf, MSEf, RMSEf } = curveFns();
-    const E = Math.max(6, Math.abs(eMov) * 1.18);          // ось ошибок: показываем и реальный промах, и запас
+    const { maxAE, MAEf, MSEf, RMSEf } = curveFns();
+    const E = Math.max(8, maxAE * 1.15);                   // ось ошибок: по размаху реальных промахов
     const ymax = MSEf(E) * 1.08;                           // ось значений: помещаем самую высокую (MSE)
     const PX = (e) => x0 + (e + E) / (2 * E) * pw;
     const PY = (v) => y0 + ph - Math.min(Math.max(v, 0), ymax) / ymax * ph;
