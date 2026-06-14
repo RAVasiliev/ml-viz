@@ -266,84 +266,66 @@
     CW = r.width; CH = r.height; cCanvas.width = Math.round(CW * dpr); cCanvas.height = Math.round(CH * dpr);
     cctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawCurves();
   }
-  let hoverE = null, hoverPx = null;                      // ховер «в любом месте»: ошибка под курсором и его пиксель
+  let hoverE = null, hoverPx = null;                      // ховер: ошибка под курсором и его пиксель
+  // Три кривые-метрики: двигаем ошибку e ОДНОГО объекта (самого крупного промаха),
+  // остальные объекты фиксированы (фон). Кривые — как от этого меняются метрики:
+  //   MAE(e) = (Σ|e| фон + |e|)/n   — линейная (галочка),
+  //   MSE(e) = (Σe² фон + e²)/n      — парабола, растёт быстрее → «наказывает сильнее»,
+  //   RMSE(e) = √MSE(e)              — корень, возвращает в млн ₽ (рядом с MAE).
+  // В точке e = (реальная ошибка объекта) кривые проходят через настоящие MAE/MSE/RMSE.
+  function curveFns() {
+    const arr = active(), n = Math.max(1, arr.length);
+    let movI = 0; for (let i = 1; i < arr.length; i++) if (Math.abs(arr[i].e) > Math.abs(arr[movI].e)) movI = i;
+    const eMov = arr.length ? arr[movI].e : 0;
+    let Kae = 0, Kse = 0; arr.forEach((d, i) => { if (i !== movI) { Kae += d.ae; Kse += d.se; } });
+    const MAEf = (e) => (Kae + Math.abs(e)) / n, MSEf = (e) => (Kse + e * e) / n, RMSEf = (e) => Math.sqrt(MSEf(e));
+    return { eMov, MAEf, MSEf, RMSEf };
+  }
   function drawCurves() {
     if (!cctx || !CW) return;
     cctx.clearRect(0, 0, CW, CH);
-    const pad = { l: 48, r: 18, t: 18, b: 40 };
+    const pad = { l: 52, r: 18, t: 18, b: 40 };
     const x0 = pad.l, y0 = pad.t, pw = CW - pad.l - pad.r, ph = CH - pad.t - pad.b;
-    const pts = active(), mm = metrics();
-    // Диапазон подбираем по самим метрикам — так все три линии (MAE, MSE, RMSE) ВСЕГДА
-    // в кадре с запасом, без зума. Крупные промахи за краем не страшны: их числа — в таблице.
-    const E = Math.max(4, mm.rmse * 1.3);
-    const ymax = E * E;
+    const { eMov, MAEf, MSEf, RMSEf } = curveFns();
+    const E = Math.max(6, Math.abs(eMov) * 1.18);          // ось ошибок: показываем и реальный промах, и запас
+    const ymax = MSEf(E) * 1.08;                           // ось значений: помещаем самую высокую (MSE)
     const PX = (e) => x0 + (e + E) / (2 * E) * pw;
-    const PY = (y) => y0 + ph - Math.min(Math.max(y, 0), ymax) / ymax * ph;
-    const toE = (px) => (px - x0) / pw * 2 * E - E;       // пиксель → ошибка
+    const PY = (v) => y0 + ph - Math.min(Math.max(v, 0), ymax) / ymax * ph;
+    const toE = (px) => (px - x0) / pw * 2 * E - E;
     curveGeom = { E, toE };
-    // ось Y (штраф L) + горизонтальная сетка с «красивым» шагом
+    // сетка/оси
     const ystep = niceStep(ymax / 4);
-    cctx.font = "11px -apple-system, system-ui, sans-serif";
-    cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
-    for (let y = 0; y <= ymax + 1e-6; y += ystep) { const Y = PY(y); cctx.strokeStyle = "rgba(20,23,28,.06)"; cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(fmtAxis(y), x0 - 7, Y); }
-    // ось X (ошибка e со знаком) с «красивым» шагом
+    cctx.font = "11px -apple-system, system-ui, sans-serif"; cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
+    for (let v = 0; v <= ymax + 1e-6; v += ystep) { const Y = PY(v); cctx.strokeStyle = "rgba(20,23,28,.06)"; cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.fillText(fmtAxis(v), x0 - 7, Y); }
     const xstep = niceStep(2 * E / 10);
     cctx.textAlign = "center"; cctx.textBaseline = "alphabetic";
     for (let e = Math.ceil(-E / xstep) * xstep; e <= E + 1e-6; e += xstep) { const X = PX(e); const zero = Math.abs(e) < 1e-9; cctx.strokeStyle = zero ? "rgba(20,23,28,.18)" : "rgba(20,23,28,.05)"; cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.fillStyle = "#8a93a3"; cctx.fillText((e > 1e-9 ? "+" : "") + fmtAxis(e), X, y0 + ph + 16); }
-    cctx.fillText("ошибка  e = y − ŷ", x0 + pw / 2, y0 + ph + 31);
-    cctx.save(); cctx.translate(13, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("штраф  L(e)", 0, 0); cctx.restore();
-    // функции потерь: L(e)=|e| (галочка) и L(e)=e² (парабола)
+    cctx.fillText("ошибка одного объекта  e,  млн ₽", x0 + pw / 2, y0 + ph + 31);
+    cctx.save(); cctx.translate(14, y0 + ph / 2); cctx.rotate(-Math.PI / 2); cctx.textAlign = "center"; cctx.fillText("значение метрики", 0, 0); cctx.restore();
+    // кривые
     const curve = (fn, color) => { cctx.strokeStyle = color; cctx.lineWidth = 2.8; cctx.beginPath(); for (let s = 0; s <= 240; s++) { const e = -E + 2 * E * s / 240, X = PX(e), Y = PY(fn(e)); s ? cctx.lineTo(X, Y) : cctx.moveTo(X, Y); } cctx.stroke(); };
-    curve((e) => e * e, "#4f46e5");
-    curve((e) => Math.abs(e), "#10b981");
-    absELabel(cctx, PX(0.9 * E) - 28, PY(0.9 * E) + 14, "#10b981");
-    eSqLabel(cctx, PX(-0.6 * E), PY((0.6 * E) * (0.6 * E)), "#4f46e5");
-    // ── апартамент-точки: ориентир на обеих кривых (бледные) ──
-    const hi = effIndex();
-    for (const d of pts) {
-      if (Math.abs(d.e) > E || d.se > ymax) continue;
-      const X = PX(d.e), hot = d.i === hi;
-      cctx.globalAlpha = hot ? 1 : 0.42;
-      cctx.beginPath(); cctx.arc(X, PY(d.se), hot ? 5.5 : 3.5, 0, 7); cctx.fillStyle = "#4f46e5"; cctx.fill();
-      cctx.beginPath(); cctx.arc(X, PY(d.ae), hot ? 5.5 : 3.5, 0, 7); cctx.fillStyle = "#10b981"; cctx.fill();
-      cctx.globalAlpha = 1;
-      if (hot) [PY(d.se), PY(d.ae)].forEach((Y) => { cctx.strokeStyle = "#14171c"; cctx.lineWidth = 1.6; cctx.beginPath(); cctx.arc(X, Y, 8, 0, 7); cctx.stroke(); });
-    }
-    // ── три метрики, каждая своей чистой линией ──
-    // MAE и RMSE — типичные размеры ошибки (млн ₽): ВЕРТИКАЛИ на оси ошибок e.
-    // MSE — средний квадрат ошибки ((млн ₽)²): ГОРИЗОНТАЛЬ на оси штрафа L.
-    // Горизонталь MSE пересекает параболу ровно там, где стоит вертикаль RMSE — это и есть RMSE = √MSE.
-    const A = approx(mm.mae), S = approx(mm.mse), R = approx(mm.rmse);
-    const dash = (c, w) => { cctx.strokeStyle = c; cctx.lineWidth = w; cctx.setLineDash([6, 4]); };
-    dash("#4f46e5", 1.7); cctx.beginPath(); cctx.moveTo(x0, PY(mm.mse)); cctx.lineTo(x0 + pw, PY(mm.mse)); cctx.stroke();      // MSE — горизонталь
-    dash("#10b981", 1.7); cctx.beginPath(); cctx.moveTo(PX(mm.mae), y0); cctx.lineTo(PX(mm.mae), y0 + ph); cctx.stroke();    // MAE — вертикаль
-    dash("#8b5cf6", 1.7); cctx.beginPath(); cctx.moveTo(PX(mm.rmse), y0); cctx.lineTo(PX(mm.rmse), y0 + ph); cctx.stroke();  // RMSE — вертикаль
-    cctx.setLineDash([]);
-    // подписи: MSE у левого края над линией; MAE и RMSE — сверху у своих вертикалей, в две строки
-    cctx.font = "700 11.5px -apple-system, sans-serif";
-    cctx.fillStyle = "#4f46e5"; cctx.textAlign = "left"; cctx.textBaseline = "bottom"; cctx.fillText("MSE " + S.eq + " " + S.s + " (млн ₽)²", x0 + 5, PY(mm.mse) - 5);
-    const vlabel = (txt, x, row, col) => {
-      cctx.fillStyle = col; cctx.textBaseline = "top"; const tw = cctx.measureText(txt).width;
-      let tx = x + 6, al = "left"; if (tx + tw > x0 + pw) { al = "right"; tx = x - 6; }
-      cctx.textAlign = al; cctx.fillText(txt, tx, y0 + 4 + row * 16);
-    };
-    vlabel("MAE " + A.eq + " " + A.s + " млн ₽", PX(mm.mae), 0, "#10b981");
-    vlabel("RMSE = √MSE ≈ " + R.s + " млн ₽", PX(mm.rmse), 1, "#8b5cf6");
-    // ── ховер: вертикаль под курсором + точки на кривых + ПАНЕЛЬ С ТРЕМЯ МЕТРИКАМИ ──
+    curve(MSEf, "#4f46e5"); curve(RMSEf, "#8b5cf6"); curve(MAEf, "#10b981");
+    // подписи кривых у правого края
+    cctx.font = "800 12.5px -apple-system, sans-serif"; cctx.textAlign = "right";
+    cctx.fillStyle = "#4f46e5"; cctx.textBaseline = "bottom"; cctx.fillText("MSE (млн ₽)²", x0 + pw - 5, PY(MSEf(E)) - 5);
+    cctx.fillStyle = "#8b5cf6"; cctx.textBaseline = "bottom"; cctx.fillText("RMSE млн ₽", x0 + pw - 5, PY(RMSEf(E)) - 5);
+    cctx.fillStyle = "#10b981"; cctx.textBaseline = "top"; cctx.fillText("MAE млн ₽", x0 + pw - 5, PY(MAEf(E)) + 5);
+    // ── ховер: вертикаль + точки на трёх кривых + ПАНЕЛЬ С ТРЕМЯ МЕТРИКАМИ (меняются с e) ──
     if (hoverE != null) {
-      const e = Math.max(-E, Math.min(E, hoverE)), ae = Math.abs(e), se = e * e, X = PX(e);
+      const e = Math.max(-E, Math.min(E, hoverE)), X = PX(e);
+      const vMAE = MAEf(e), vMSE = MSEf(e), vRMSE = RMSEf(e);
       cctx.strokeStyle = "rgba(20,23,28,.38)"; cctx.lineWidth = 1.2; cctx.setLineDash([4, 4]);
       cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
       const dot = (v, c) => {
         if (v > ymax) { cctx.fillStyle = c; cctx.beginPath(); cctx.moveTo(X, y0 + 3); cctx.lineTo(X - 5, y0 + 12); cctx.lineTo(X + 5, y0 + 12); cctx.closePath(); cctx.fill(); return; }
         cctx.beginPath(); cctx.arc(X, PY(v), 5.5, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke();
       };
-      dot(se, "#4f46e5"); dot(ae, "#10b981");
-      // панель: сверху — вклад этой ошибки, ниже — все три итоговые метрики (их и хотим видеть)
-      const head = "ошибка e = " + (e > 0 ? "+" : "") + (Math.round(e * 10) / 10) + ":  |e| = " + (Math.round(ae * 10) / 10) + ",  e² = " + (Math.round(se * 10) / 10);
-      const rows = [["#34d399", "MAE " + A.eq + " " + A.s + " млн ₽"], ["#818cf8", "MSE " + S.eq + " " + S.s + " (млн ₽)²"], ["#c4b5fd", "RMSE = √MSE ≈ " + R.s + " млн ₽"]];
+      dot(vMSE, "#4f46e5"); dot(vRMSE, "#8b5cf6"); dot(vMAE, "#10b981");
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const head = "ошибка объекта  e = " + (e > 0 ? "+" : "") + (Math.round(e * 10) / 10) + " млн ₽";
+      const rows = [["#34d399", "MAE = " + r2(vMAE) + " млн ₽"], ["#818cf8", "MSE = " + r2(vMSE) + " (млн ₽)²"], ["#c4b5fd", "RMSE = " + r2(vRMSE) + " млн ₽"]];
       cctx.font = "600 11px -apple-system, sans-serif"; let tw = cctx.measureText(head).width;
-      cctx.font = "800 13px -apple-system, sans-serif"; rows.forEach((r) => tw = Math.max(tw, cctx.measureText(r[1]).width));
+      cctx.font = "800 13px -apple-system, sans-serif"; rows.forEach((rw) => tw = Math.max(tw, cctx.measureText(rw[1]).width));
       tw += 24; const th = 96;
       let tx = X + 16; if (tx + tw > CW - 4) tx = X - tw - 16; if (tx < 4) tx = 4;
       let ty = (hoverPx ? hoverPx.y - th / 2 : y0 + 8); if (ty < y0 + 4) ty = y0 + 4; if (ty + th > y0 + ph) ty = y0 + ph - th - 2;
@@ -352,28 +334,18 @@
       cctx.font = "600 11px -apple-system, sans-serif"; cctx.fillStyle = "#cbd5e1"; cctx.fillText(head, tx + 12, ty + 10);
       cctx.strokeStyle = "rgba(255,255,255,.14)"; cctx.lineWidth = 1; cctx.beginPath(); cctx.moveTo(tx + 12, ty + 29); cctx.lineTo(tx + tw - 12, ty + 29); cctx.stroke();
       cctx.font = "800 13px -apple-system, sans-serif";
-      rows.forEach((r, k) => { cctx.fillStyle = r[0]; cctx.fillText(r[1], tx + 12, ty + 37 + k * 19); });
+      rows.forEach((rw, k) => { cctx.fillStyle = rw[0]; cctx.fillText(rw[1], tx + 12, ty + 37 + k * 19); });
     }
-  }
-  // курсор → ближайшая квартира (для перекрёстной подсветки строки/формулы при наведении у точки)
-  function snapApt(e) {
-    if (e == null || !curveGeom) return -1;
-    let best = -1, bd = 1e9;
-    for (const d of active()) { const dd = Math.abs(d.e - e); if (dd < bd) { bd = dd; best = d.i; } }
-    return bd <= curveGeom.E * 0.05 ? best : -1;
   }
   if (cCanvas) {
     cCanvas.style.cursor = "crosshair";
     cCanvas.addEventListener("mousemove", (ev) => {
       const r = cCanvas.getBoundingClientRect();
       hoverPx = { x: ev.clientX - r.left, y: ev.clientY - r.top };
-      const e = curveGeom ? curveGeom.toE(hoverPx.x) : null;
-      hoverE = (e == null) ? null : Math.max(-curveGeom.E, Math.min(curveGeom.E, e));
-      setHover(snapApt(hoverE));                 // перекрёстная подсветка + перерисовка (если не закреплено)
-      if (state.pinned >= 0) drawCurves();       // закреплено — обновляем только направляющую
+      hoverE = curveGeom ? curveGeom.toE(hoverPx.x) : null;
+      drawCurves();
     });
-    cCanvas.addEventListener("mouseleave", () => { hoverE = null; hoverPx = null; setHover(-1); if (state.pinned >= 0) drawCurves(); });
-    cCanvas.addEventListener("click", (ev) => { const r = cCanvas.getBoundingClientRect(); setPin(snapApt(curveGeom ? curveGeom.toE(ev.clientX - r.left) : null)); });
+    cCanvas.addEventListener("mouseleave", () => { hoverE = null; hoverPx = null; drawCurves(); });
   }
 
   // ---------- управление ----------

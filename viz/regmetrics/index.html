@@ -136,12 +136,12 @@
 
     <div class="verdict" id="verdict" style="margin-top:14px"></div>
 
-    <div class="section-title">Функции потерь L(e): почему MSE наказывает сильнее</div>
-    <p class="hint-inline" style="margin:0 0 8px;font-size:13px">Наведи на график в любом месте — во всплывающей панели появятся все три метрики: <b style="color:#10b981">MAE</b>, <b style="color:#4f46e5">MSE</b>, <b style="color:#8b5cf6">RMSE</b>. Три пунктира на поле — те же метрики: вертикали <b style="color:#10b981">MAE</b> и <b style="color:#8b5cf6">RMSE</b> (млн ₽), горизонталь <b style="color:#4f46e5">MSE</b> ((млн ₽)²); где <b style="color:#4f46e5">MSE</b> пересекает параболу — там и <b style="color:#8b5cf6">RMSE = √MSE</b>.</p>
+    <div class="section-title">Как растут метрики с ошибкой: почему MSE наказывает сильнее</div>
+    <p class="hint-inline" style="margin:0 0 8px;font-size:13px">Тянем ошибку <i>e</i> одного объекта (ось X), остальные — как есть. Три кривые показывают, как от этого меняются метрики: <b style="color:#10b981">MAE</b> растёт линейно, <b style="color:#4f46e5">MSE</b> — квадратично (потому и «наказывает сильнее»), <b style="color:#8b5cf6">RMSE = √MSE</b> возвращает в млн ₽ — рядом с MAE, но круче на больших промахах. Наведи — во всплывающей панели три значения <b style="color:#10b981">MAE</b>, <b style="color:#4f46e5">MSE</b>, <b style="color:#8b5cf6">RMSE</b> для этой ошибки.</p>
     <div class="curve-host"><canvas id="curves"></canvas></div>
   </main>
 
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
   <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null});}catch(err){}});</script>
 </body>
 </html>
