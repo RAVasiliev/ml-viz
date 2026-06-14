@@ -120,5 +120,34 @@
     }
   }
 
-  window.GD3D = { buildGrid, render };
+  // Пикинг: по экранным координатам (px,py) находим вершину сетки 3D-проекции,
+  // которая проецируется ближе всего к курсору, и возвращаем её (u,v) в домене.
+  // Геометрия проекции повторяет render() один-в-один.
+  function pick(grid, cam, W, H, px, py) {
+    const N = grid.N, L = grid.L, hd = grid.hd, d = grid.domain;
+    const S = 0.40 * Math.min(W, H);
+    const cx = W / 2, cyc = H * 0.56;
+    const xn = (i) => (i / N) * 2 - 1;
+    let best = null, bestD2 = Infinity;
+    for (let j = 0; j <= N; j++) {
+      for (let i = 0; i <= N; i++) {
+        const z = hd(L[j * (N + 1) + i]);
+        const p = project(xn(i), xn(j), z, cam);
+        const X = cx + S * p.sx, Y = cyc + S * p.sy;
+        const dx = X - px, dy = Y - py, d2 = dx * dx + dy * dy;
+        if (d2 < bestD2) {
+          bestD2 = d2;
+          best = {
+            u: d.umin + (i / N) * (d.umax - d.umin),
+            v: d.vmin + (j / N) * (d.vmax - d.vmin),
+            dist: 0,
+          };
+        }
+      }
+    }
+    if (best) best.dist = Math.sqrt(bestD2);
+    return best;
+  }
+
+  window.GD3D = { buildGrid, render, pick };
 })();

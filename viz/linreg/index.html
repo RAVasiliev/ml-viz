@@ -6,9 +6,15 @@
   <title>Линейная регрессия — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
     /* специфика linreg: подпись формулы линии и легенда остатков — инлайном */
+    .lab-head p.lead { font-size:15px; line-height:1.55; color:var(--muted); max-width:none; }
+    .lead b { color:var(--ink); }
+    .lead .kf { display:inline-block; vertical-align:baseline; }
+    .lead .kf .katex { font-size:1.04em; }
     .eqn {
       font-family: var(--mono);
       font-size: 12.5px;
@@ -49,8 +55,9 @@
   <main class="lab">
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Регрессия · Линейная регрессия</div>
-      <h1>Линейная регрессия (1D)</h1>
-      <p>Модель <b>ŷ = a·x + b</b> подбирает прямую под облако точек. <b>OLS</b> минимизирует <b>MSE</b> — сумму квадратов остатков, поэтому каждый выброс тянет линию к себе с силой квадрата ошибки. Лосс <b>MAE</b> штрафует ошибку линейно и потому устойчив к выбросам. <b>Остатки</b> yᵢ − ŷᵢ — вертикальные отрезки от точки до линии; по ним считаются MSE, MAE, RMSE, R² и MAPE — метрики недели 1.</p>
+      <h1>Линейная регрессия</h1>
+      <p class="lead">Модель <span class="kf" data-tex="\hat{y}=a\,x+b"></span> подбирает прямую под облако точек. <b>Остаток</b> <span class="kf" data-tex="e_i=y_i-\hat{y}_i"></span> — вертикальный отрезок от точки до линии. <b>МНК</b> минимизирует <b>MSE</b> (сумму квадратов остатков), поэтому каждый выброс тянет линию к себе с силой <i>квадрата</i> ошибки. Лосс <b>MAE</b> штрафует ошибку линейно и потому устойчив к выбросам. По остаткам считаются метрики качества: <b>MSE</b>, <b>MAE</b>, <b>RMSE</b>, <b>R²</b> и <b>MAPE</b>.</p>
+      <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> меняй данные, шум и лосс; переключи подгонку на «Градиентный спуск» и жми <b>Запуск</b> — линия встанет на место по итерациям. Метрики пересчитываются вживую.</span></div>
     </div>
 
     <div class="lab-grid">
@@ -58,7 +65,7 @@
         <div class="control">
           <label for="dataset">Данные</label>
           <select id="dataset"></select>
-          <div class="hint">«С выбросом» — одна точка резко вверх: смотри, как MSE-линия уезжает, а MAE держится.</div>
+          <div class="hint">«С выбросом» — одна точка резко вверх: MSE-линия уезжает к ней, MAE держится.</div>
         </div>
         <div class="control">
           <label for="points">Точек <span class="val" id="pointsVal">60</span></label>
@@ -102,7 +109,7 @@
             <button class="btn" id="reset" title="Сброс (R)">↺ Сброс</button>
             <button class="btn" id="regen" title="Новые данные (N)">🎲 Данные</button>
           </div>
-          <div class="hint" id="gdHint">Режим «Градиентный спуск»: линия встаёт на место по итерациям.</div>
+          <div class="hint" id="gdHint">В режиме «Градиентный спуск» линия встаёт на место по итерациям.</div>
         </div>
         <div class="control">
           <div class="stats">
@@ -120,7 +127,7 @@
       <section class="stage">
         <div class="canvas-host">
           <canvas id="canvas"></canvas>
-          <div class="canvas-hint">красные отрезки — остатки yᵢ − ŷᵢ</div>
+          <div class="canvas-hint">красные отрезки — остатки (расстояние от точки до линии)</div>
         </div>
         <div class="dendro-wrap">
           <div class="dendro-label">Параметры подобранной линии</div>
@@ -139,5 +146,6 @@
 
   <script src="linreg.js"></script>
   <script src="app.js"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null})}catch(err){}});</script>
 </body>
 </html>

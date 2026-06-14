@@ -12,6 +12,8 @@
   <style>
     .lab-head p.lead { font-size:15.5px; line-height:1.55; color:var(--muted); max-width:none; }
     .lead b { color:var(--ink); }
+    .lead .kf { display:inline-block; vertical-align:baseline; }
+    .lead .kf .katex { font-size:1.04em; }
     .section-title { font-size:13px; font-weight:650; letter-spacing:.02em; text-transform:uppercase; color:var(--faint); margin:26px 0 12px; }
     .controls-bar { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-top:14px; }
     .ctl { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--ink); }
@@ -19,20 +21,8 @@
     .ctl b { font-family:var(--mono); color:var(--accent); min-width:22px; text-align:center; }
     .hint-inline { font-size:12.5px; color:var(--faint); }
 
-    /* грядка арбузов */
-    .shelf { display:grid; grid-template-columns:repeat(8, 1fr); gap:10px; }
-    .melon { background:var(--surface); border:1.5px solid var(--line); border-radius:14px; padding:10px 8px 9px;
-      text-align:center; cursor:pointer; transition:transform .12s, box-shadow .12s, border-color .12s; position:relative; }
-    .melon:hover, .melon.hl { transform:translateY(-4px); box-shadow:var(--shadow-md); border-color:var(--accent); }
-    .melon.dim { opacity:.4; }
-    .melon .emoji { font-size:30px; line-height:1.1; }
-    .melon .guess { font-size:12px; color:#0ea5e9; font-weight:650; font-family:var(--mono); margin-top:3px; }
-    .melon .real { font-size:12px; color:#334155; font-weight:650; font-family:var(--mono); }
-    .melon .miss { position:absolute; top:6px; right:7px; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:100px; }
-    .melon .num { font-size:10px; color:var(--faint); }
-
     .grid2 { display:grid; grid-template-columns:1.15fr 1fr; gap:20px; align-items:start; }
-    @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } .shelf { grid-template-columns:repeat(4,1fr);} }
+    @media (max-width:900px){ .grid2 { grid-template-columns:1fr; } }
 
     .chart-host { position:relative; width:100%; height:430px; border-radius:12px; border:1px solid var(--line);
       background:radial-gradient(circle at 1px 1px, rgba(20,23,28,.04) 1px, transparent 0) 0 0/22px 22px, var(--surface-2); overflow:hidden; }
@@ -44,7 +34,9 @@
     .check { display:inline-flex; align-items:center; gap:7px; font-size:13px; color:var(--muted); cursor:pointer; user-select:none; }
 
     /* таблица */
+    .table-wrap { max-height:430px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
     table.calc { width:100%; border-collapse:collapse; font-size:13px; }
+    .table-wrap table.calc thead th { position:sticky; top:0; background:var(--surface); z-index:1; box-shadow:0 1px 0 var(--line); }
     table.calc th, table.calc td { padding:7px 8px; text-align:right; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; font-family:var(--mono); }
     table.calc th { font-size:11px; color:var(--faint); font-weight:650; text-transform:none; font-family:var(--font); }
     table.calc td.obj, table.calc th.obj { text-align:left; font-family:var(--font); }
@@ -60,37 +52,24 @@
     .mrow { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px; box-shadow:var(--shadow-sm); }
     .mrow .mhead { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
     .mrow .mname { font-size:16px; font-weight:700; }
-    .mrow .mdesc { font-size:12.5px; color:var(--muted); }
-    .mrow .sum { font-family:var(--mono); font-size:14px; line-height:1.9; color:var(--ink); }
-    .term { display:inline-block; padding:1px 6px; border-radius:6px; transition:background .1s, transform .1s; }
-    .term.hl { background:#fde68a; transform:scale(1.18); font-weight:700; }
-    .mrow .res { font-size:22px; font-weight:800; letter-spacing:-.02em; }
     .mae-c { color:#10b981; } .mse-c { color:#4f46e5; } .rmse-c { color:#8b5cf6; }
     .verdict { background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:14px 16px; font-size:14px; line-height:1.6; color:#713f12; }
     .verdict b { color:#92400e; }
 
-    /* длинный корень RMSE */
-    .sqrt { display:inline-flex; align-items:flex-start; vertical-align:middle; }
-    .sqrt .sign { font-size:21px; line-height:1; margin-right:1px; transform:translateY(-3px); }
-    .sqrt .rad { border-top:2px solid currentColor; padding:3px 9px 0; }
-    /* кривульки штрафа */
+    /* график функций потерь */
     .curve-host { position:relative; width:100%; height:300px; border-radius:12px; border:1px solid var(--line);
       background:var(--surface-2); overflow:hidden; }
     .curve-host canvas { position:absolute; inset:0; width:100%; height:100%; cursor:default; }
-
-    /* математическая типографика */
-    .math { font-family:"STIX Two Math","Cambria Math","Latin Modern Math","Times New Roman",Georgia,serif; font-size:1.05em; white-space:nowrap; }
-    .math i, .math em { font-style:italic; }
-    .frac { display:inline-flex; flex-direction:column; vertical-align:middle; text-align:center; line-height:1.18; margin:0 3px; }
-    .frac .den { border-top:1.6px solid currentColor; padding-top:1px; }
-    .sqrtm { display:inline-flex; align-items:stretch; vertical-align:middle; }
-    .sqrtm .sgn { font-size:1.35em; line-height:1.15; }
-    .sqrtm .rad { border-top:1.7px solid currentColor; padding:5px 9px 0; margin-left:-3px; }
-    .sumop { position:relative; display:inline-block; font-size:1.5em; line-height:1; padding:0 .55em 0 .12em; vertical-align:middle; }
-    .sumop sup { position:absolute; top:-.52em; left:52%; transform:translateX(-50%); font-size:.4em; font-style:normal; }
-    .sumop sub { position:absolute; bottom:-.46em; left:52%; transform:translateX(-50%); font-size:.4em; font-style:normal; }
-    .mline { font-size:16px; line-height:2.5; margin-top:4px; }
-    .mlabel { font-weight:700; font-size:17px; }
+    /* ховер-ридаут под графиком потерь: e, MSE, MAE, RMSE разом */
+    .readout { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; margin-top:10px; min-height:34px; }
+    .readout .rcell { display:inline-flex; align-items:baseline; gap:6px; background:var(--surface); border:1px solid var(--line);
+      border-radius:9px; padding:6px 11px; font-size:13px; box-shadow:var(--shadow-sm); }
+    .readout .rcell .katex { font-size:1.06em; }
+    .readout .rcell.re { border-color:#cbd5e1; }
+    .readout .rcell.rmae { border-color:#10b981; }
+    .readout .rcell.rmse { border-color:#4f46e5; }
+    .readout .rcell.rrmse { border-color:#8b5cf6; }
+    .readout .obj-tag { font-size:12.5px; color:var(--faint); font-weight:600; margin-right:2px; }
 
     /* формулы KaTeX */
     .metric-eq { display:flex; align-items:baseline; flex-wrap:nowrap; gap:4px; overflow-x:auto; overflow-y:hidden; padding:6px 2px 6px 0; }
@@ -131,15 +110,15 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Регрессия · Метрики ошибки</div>
       <h1>Метрики регрессии: MAE / MSE / RMSE</h1>
-      <p class="lead">Для каждой квартиры модель даёт <b style="color:#0ea5e9">прогноз стоимости <i>ŷ</i></b>, а реальная сделка — <b style="color:#334155">факт <i>y</i></b> (в млн ₽). Их разность — ошибка <i>e</i> = <i>y</i> − <i>ŷ</i>. Вопрос: <b>насколько модель ошибается в цене в среднем?</b> На него отвечают три метрики — <b>MAE</b>, <b>MSE</b>, <b>RMSE</b>.</p>
+      <p class="lead">Решаем задачу предсказания стоимости квартир. Для каждой квартиры модель даёт <b style="color:#0ea5e9">прогноз стоимости <span class="kf" data-tex="\hat y"></span></b> (млн ₽), а реальная сделка — <b style="color:#334155">факт <span class="kf" data-tex="y"></span></b> (млн ₽). Их разность — ошибка <span class="kf" data-tex="e = y - \hat y"></span>. Вопрос: <b>насколько модель ошибается в цене в среднем?</b> На него отвечают три метрики — <span class="kf" data-tex="\mathrm{MAE}"></span>, <span class="kf" data-tex="\mathrm{MSE}"></span>, <span class="kf" data-tex="\mathrm{RMSE}"></span>.</p>
     </div>
 
     <div class="controls-bar">
-      <label class="ctl">Квартир: <input type="range" id="count" min="4" max="20" step="1" value="8" /><b id="countVal">8</b></label>
-      <label class="ctl">Качество модели: <span style="color:#10b981;font-weight:700">хорошее</span> <input type="range" id="quality" min="0" max="100" step="1" value="40" /> <span style="color:#ef4444;font-weight:700">плохое</span></label>
+      <label class="ctl">Квартир <input type="range" id="count" min="4" max="20" step="1" value="8" /><b id="countVal">8</b></label>
+      <label class="ctl">Качество модели <input type="range" id="quality" min="0" max="100" step="1" value="60" /><b id="qualityVal">средняя</b></label>
       <button class="btn" id="newData" style="flex:none">🎲 Новые квартиры</button>
-      <span class="hint-inline">наведи на любую квартиру — она подсветится в таблице, на графике и в формуле</span>
     </div>
+    <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> наведи на квартиру — подсветится в таблице, на графике и в формуле; клик — закрепить.</span></div>
 
     <div class="grid2" style="margin-top:20px">
       <div>
@@ -153,10 +132,12 @@
         <div class="chart-host"><canvas id="chart"></canvas></div>
       </div>
       <div>
-        <div class="section-title" style="margin-top:0">Таблица: как промах превращается в число</div>
-        <table class="calc"><thead>
-          <tr><th class="obj">квартира</th><th>прогноз <i>ŷ</i>, млн ₽</th><th>факт <i>y</i>, млн ₽</th><th>ошибка <i>e</i>, млн ₽</th><th class="mae">|<i>e</i>|</th><th class="mse"><i>e</i>²</th></tr>
-        </thead><tbody id="tbody"></tbody></table>
+        <div class="section-title" style="margin-top:0">Таблица объектов</div>
+        <div class="table-wrap">
+          <table class="calc"><thead>
+            <tr><th class="obj">квартира</th><th>прогноз <i>ŷ</i>, млн ₽</th><th>факт <i>y</i>, млн ₽</th><th>ошибка <i>e</i>, млн ₽</th><th class="mae">|<i>e</i>|</th><th class="mse"><i>e</i>²</th></tr>
+          </thead><tbody id="tbody"></tbody></table>
+        </div>
       </div>
     </div>
 
@@ -176,9 +157,10 @@
       <span class="hint-inline">или колесо мыши над графиком</span>
     </div>
     <div class="curve-host"><canvas id="curves"></canvas></div>
-    <p class="hint-inline" style="display:block;margin-top:8px">Кривые потерь от ошибки <i>e</i> = <i>y</i> − <i>ŷ</i>: <b style="color:#10b981">|e|</b> (линейный штраф → MAE) и <b style="color:#4f46e5">e²</b> (квадратичный штраф → MSE). Пунктиром — средние высоты штрафа: <b style="color:#10b981">MAE</b> и <b style="color:#4f46e5">MSE</b>; а <b style="color:#8b5cf6">RMSE = √MSE</b> — это та же синяя высота, спроецированная через параболу обратно на ось ошибок (снова в млн ₽). Каждая квартира — точка на обеих кривых при своей ошибке: при крупном промахе парабола взлетает несоизмеримо выше прямой — поэтому MSE так чувствительна к выбросам. Наведи или кликни на квартиру — подсветится здесь и в таблице.</p>
+    <div class="readout" id="readout"></div>
   </main>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null});}catch(err){}});</script>
 </body>
 </html>

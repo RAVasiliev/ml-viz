@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Метрики классификации: болен или здоров? — ML-виз</title>
+  <title>Метрики классификации: Accuracy, Precision, Recall, F1-мера — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css?v=2" />
   <link rel="stylesheet" href="../../assets/css/viz.css?v=2" />
   <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
@@ -17,7 +17,19 @@
     .kf { display:inline-block; }
     .mf .katex { font-size:1.02em; }
     .sick { color:#ef4444; } .healthy { color:#10b981; }
-    .controls-bar { display:flex; align-items:center; gap:20px; flex-wrap:wrap; margin-top:14px; }
+
+    /* раскрывающиеся блоки с подробностями (как в rocauc) */
+    .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 4px; }
+    @media (max-width:820px){ .cats { grid-template-columns:1fr; } }
+    .cat { border:1px solid var(--line); border-radius:11px; background:var(--surface); box-shadow:var(--shadow-sm); }
+    .cat > summary { cursor:pointer; padding:11px 15px; font-weight:650; font-size:14px; list-style:none; display:flex; align-items:center; gap:9px; }
+    .cat > summary::-webkit-details-marker { display:none; }
+    .cat > summary::before { content:"▸"; color:var(--accent); font-size:12px; transition:transform .15s; }
+    .cat[open] > summary::before { transform:rotate(90deg); }
+    .cat .cb { padding:0 16px 14px; font-size:13.5px; line-height:1.6; color:var(--muted); }
+    .cat .cb b { color:var(--ink); }
+    .cat .cb .katex { color:var(--ink); }
+    .controls-bar { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-top:14px; }
     .ctl { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink); }
     .ctl input[type=range] { width:150px; }
     .ctl b { font-family:var(--mono); color:var(--accent); min-width:46px; text-align:center; }
@@ -75,16 +87,51 @@
   <main class="lab" style="max-width:1120px">
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Метрики качества · Классификация</div>
-      <h1>Метрики классификации: болен или здоров?</h1>
-      <p class="lead">Классификатор выдаёт каждому человеку <b>оценку</b> <span class="kf" data-tex="s(x)\in[0,1]"></span> — вероятность того, что он болен. Решение бинарно, поэтому фиксируем <b>порог</b> <span class="kf" data-tex="\tau"></span> и предсказываем <span class="kf" data-tex="\hat{y}=\mathbf{1}\,[\,s(x)\ge\tau\,]"></span>: выше порога — <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. Сравнив прогноз <span class="kf" data-tex="\hat{y}"></span> с истиной <span class="kf" data-tex="y\in\{0,1\}"></span>, каждый человек попадает в одну клетку <b>матрицы ошибок</b> — <b>TP, FP, FN, TN</b>; из этих четырёх чисел и считаются метрики <b style="color:#475569">Accuracy</b>, <b style="color:#0ea5e9">Precision</b>, <b style="color:#4f46e5">Recall</b> и <b style="color:#8b5cf6">F1</b>. На гистограмме высота — <b>сколько людей</b> с такой оценкой (<b class="healthy">зелёные</b> здоровы, <b class="sick">красные</b> больны). Порог <span class="kf" data-tex="\tau"></span> — это <b>компромисс</b>: двигай его и смотри, как меняются ошибки и метрики.</p>
+      <h1>Метрики классификации: Accuracy, Precision, Recall, F1-мера</h1>
+      <p class="lead">Пример — диагностика: болен человек или здоров. Классификатор выдаёт каждому <b>оценку</b> <span class="kf" data-tex="s(x)\in[0,1]"></span> «насколько похоже на болезнь». Чтобы принять бинарное решение, выбираем <b>порог</b> <span class="kf" data-tex="\tau"></span>: выше — <b class="sick">«болен»</b>, ниже — <b class="healthy">«здоров»</b>. Сравнение прогноза с истиной даёт четыре числа <b>TP, FP, FN, TN</b>, а из них — четыре метрики. Порог — это компромисс: двигай его и смотри, как меняются ошибки и метрики. Подробности — в блоках ниже.</p>
+    </div>
+
+    <div class="cats">
+      <details class="cat">
+        <summary>Оценка и порог: как из числа получается решение</summary>
+        <div class="cb">
+          Модель не говорит «да/нет» — она выдаёт <b>скор</b> <span class="kf" data-tex="s(x)\in[0,1]"></span>: чем выше, тем сильнее подозрение на болезнь. Решение получаем сравнением с порогом <span class="kf" data-tex="\tau"></span>:
+          <div class="kf" data-tex="\hat{y}=\mathbf{1}\,[\,s(x)\ge\tau\,]" data-block></div>
+          То есть <span class="kf" data-tex="\hat{y}=1"></span> («болен»), если скор не ниже порога, иначе <span class="kf" data-tex="\hat{y}=0"></span> («здоров»). На гистограмме высота столбика — <b>сколько людей</b> получили такой скор: <b class="healthy">зелёные</b> на самом деле здоровы, <b class="sick">красные</b> больны.
+        </div>
+      </details>
+      <details class="cat">
+        <summary>Матрица ошибок: TP, FP, FN, TN</summary>
+        <div class="cb">
+          Сравниваем прогноз <span class="kf" data-tex="\hat{y}"></span> с истиной <span class="kf" data-tex="y\in\{0,1\}"></span> — каждый человек попадает в одну из четырёх клеток:
+          <ul style="margin:8px 0 0; padding-left:18px">
+            <li><b>TP</b> — больной, тест сказал «болен» (поймали);</li>
+            <li><b>FP</b> — здоровый, тест сказал «болен» (ложная тревога);</li>
+            <li><b>FN</b> — больной, тест сказал «здоров» (пропустили);</li>
+            <li><b>TN</b> — здоровый, тест сказал «здоров» (верно отпустили).</li>
+          </ul>
+        </div>
+      </details>
+      <details class="cat">
+        <summary>Четыре метрики из матрицы ошибок</summary>
+        <div class="cb">
+          <b style="color:#475569">Accuracy</b> — доля верных ответов из всех; обманчива при перекосе классов:
+          <div class="kf" data-tex="\mathrm{Accuracy}=\dfrac{TP+TN}{TP+FP+FN+TN}" data-block></div>
+          <b style="color:#4f46e5">Recall</b> — из всех больных скольких поймали; <b style="color:#0ea5e9">Precision</b> — из названных больными сколько правда больны:
+          <div class="kf" data-tex="\mathrm{Recall}=\dfrac{TP}{TP+FN}\qquad \mathrm{Precision}=\dfrac{TP}{TP+FP}" data-block></div>
+          <b style="color:#8b5cf6">F1</b> — гармоническое среднее Precision и Recall, высок только когда обе хороши:
+          <div class="kf" data-tex="F_1=\dfrac{2\cdot\mathrm{Precision}\cdot\mathrm{Recall}}{\mathrm{Precision}+\mathrm{Recall}}=\dfrac{2\,TP}{2\,TP+FP+FN}" data-block></div>
+        </div>
+      </details>
     </div>
 
     <div class="controls-bar">
-      <label class="ctl">Точность теста: <input type="range" id="sep" min="0.05" max="0.42" step="0.01" value="0.24" /><b id="sepVal">ср.</b></label>
-      <label class="ctl">Доля больных: <input type="range" id="bal" min="0.1" max="0.6" step="0.05" value="0.4" /><b id="balVal">40%</b></label>
-      <label class="ctl">Людей: <input type="range" id="count" min="20" max="5000" step="20" value="500" /><b id="countVal">500</b></label>
+      <label class="ctl">Качество модели <input type="range" id="sep" min="0.05" max="0.42" step="0.01" value="0.24" /><b id="sepVal">средняя</b></label>
+      <label class="ctl">Доля больных <input type="range" id="bal" min="0.1" max="0.6" step="0.05" value="0.4" /><b id="balVal">40%</b></label>
+      <label class="ctl">Людей <input type="range" id="count" min="20" max="5000" step="20" value="500" /><b id="countVal">500</b></label>
       <button class="btn" id="newData" style="flex:none">🎲 Новые люди</button>
     </div>
+    <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> тащи линию порога на гистограмме или на нижнем графике — метрики пересчитываются вживую.</span></div>
 
     <div class="stage-card">
       <div class="thr-readout">

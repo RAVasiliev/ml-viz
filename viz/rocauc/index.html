@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ROC-кривая и AUC — как строится по таблице — ML-виз</title>
+  <title>ROC-AUC: считаем по шагам — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
     /* широкий лид — перебиваем max-width:720 из .lab-head p */
@@ -23,13 +25,14 @@
     .cat[open] > summary::before { transform:rotate(90deg); }
     .cat .cb { padding:0 16px 14px; font-size:13.5px; line-height:1.6; color:var(--muted); }
     .cat .cb b { color:var(--ink); }
-    .formula { font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--line); border-radius:7px; padding:2px 7px; display:inline-block; margin:2px 3px 2px 0; }
+    .kf { display:inline-block; }
+    .cat .cb .katex { color:var(--ink); }
     .auc-scale-line { display:flex; margin-top:10px; border-radius:6px; overflow:hidden; font-size:11px; font-weight:700; text-align:center; }
     .auc-scale-line div { padding:4px 2px; color:#fff; }
 
     .controls-bar { display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin:16px 0 4px; }
     .ctl { display:flex; align-items:center; gap:9px; font-size:13.5px; font-weight:600; color:var(--ink); }
-    .ctl input[type=range] { width:140px; }
+    .ctl input[type=range] { width:150px; }
     .ctl b { font-family:var(--mono); color:var(--accent); min-width:34px; text-align:center; }
 
     /* 3 колонки: таблица — кривая — значения */
@@ -87,8 +90,8 @@
   <main class="lab" style="max-width:1180px">
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · ROC и AUC</div>
-      <h1>ROC-кривая и AUC</h1>
-      <p class="lead"><b>ROC</b> — Receiver Operating Characteristic, <b>AUC</b> — Area Under the Curve. Меряют качество <b>бинарной классификации с вероятностным выходом</b>: модель выдаёт не «да/нет», а скор (вероятность класса), и эти метрики показывают, насколько хорошо она ранжирует объекты — независимо от выбора порога.</p>
+      <h1>ROC-AUC: считаем по шагам</h1>
+      <p class="lead"><b>ROC</b> — Receiver Operating Characteristic, <b>AUC</b> — Area Under the Curve. Меряют качество <b>бинарной классификации</b>: модель выдаёт не «да/нет», а <b>скор</b> (произвольное число, по которому ранжирует объекты — не обязательно вероятность). ROC и AUC показывают, насколько хорошо этот скор разделяет классы — независимо от выбора порога.</p>
     </div>
 
     <div class="cats">
@@ -97,7 +100,7 @@
         <div class="cb">
           Сортируем объекты по <b>скору</b> модели (сверху — кого сильнее подозревает). Опускаем порог сверху вниз и по очереди объявляем «болен». Каждый объект двигает точку:
           <b class="sick">больной → шаг вверх</b> (поймали, ↑TPR), <b class="healthy">здоровый → шаг вправо</b> (ложная тревога, ↑FPR).<br>
-          Оси: <span class="formula">TPR = TP/(TP+FN)</span> (Y) и <span class="formula">FPR = FP/(FP+TN) = 1−Specificity</span> (X). Порог едет от 1 к 0: старт <b>(0,0)</b>, финиш <b>(1,1)</b>.
+          Оси: <span class="kf" data-tex="\mathrm{TPR}=\dfrac{TP}{TP+FN}"></span> (Y) и <span class="kf" data-tex="\mathrm{FPR}=\dfrac{FP}{FP+TN}=1-\mathrm{Specificity}"></span> (X). Порог едет от 1 к 0: старт <b>(0,0)</b>, финиш <b>(1,1)</b>.
         </div>
       </details>
       <details class="cat">
@@ -117,19 +120,20 @@
     </div>
 
     <div class="controls-bar">
-      <label class="ctl">Пациентов: <input type="range" id="count" min="6" max="400" step="1" value="12" /><b id="countVal">12</b></label>
-      <label class="ctl">Качество теста: <input type="range" id="sep" min="0.0" max="0.4" step="0.02" value="0.22" /><b id="sepVal">ср.</b></label>
+      <label class="ctl">Пациентов <input type="range" id="count" min="6" max="400" step="1" value="12" /><b id="countVal">12</b></label>
+      <label class="ctl">Качество модели <input type="range" id="sep" min="0.0" max="0.4" step="0.02" value="0.22" /><b id="sepVal">средняя</b></label>
       <button class="btn" id="newData" style="flex:none">🎲 Новые данные</button>
       <button class="btn primary" id="build" style="flex:none">▶ Построить по шагам</button>
     </div>
+    <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> жми «Построить по шагам», выдели зум рамкой, клик по точке кривой — выбрать порог.</span></div>
 
     <div class="grid3">
       <div>
-        <div class="panel-title">Прогноз модели и фактические значения · отсортированы по прогнозу модели</div>
+        <div class="panel-title">Скоры модели (по убыванию)</div>
         <div class="table-wrap">
           <table class="dt">
             <thead><tr>
-              <th>#</th><th>прогноз</th><th>факт</th><th>шаг</th><th>при&nbsp;пороге</th>
+              <th>#</th><th>скор</th><th>факт</th><th>шаг</th><th>при&nbsp;пороге</th>
             </tr></thead>
             <tbody id="tbody"></tbody>
           </table>
@@ -138,7 +142,7 @@
 
       <div>
         <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center">
-          <span>ROC-кривая (лесенка)</span>
+          <span>ROC-кривая</span>
           <button class="btn" id="zoomReset" style="flex:none;padding:4px 11px;font-size:12px;text-transform:none;letter-spacing:0;font-weight:600">⤢ сброс зума</button>
         </div>
         <div class="cut-info" id="cutInfo"></div>
@@ -147,7 +151,7 @@
       </div>
 
       <div>
-        <div class="panel-title">Значения</div>
+        <div class="panel-title" aria-hidden="true"></div>
         <div class="auc-banner">
           <div class="lbl">AUC — площадь под кривой</div>
           <div class="v" id="aucVal">—</div>

@@ -1,7 +1,7 @@
 /* «Насколько мы промахнулись? MAE / MSE / RMSE» — детски-понятная страница.
-   Угадываем вес квартираов (ŷ), кладём на весы (y), промах e=y−ŷ превращаем
-   в ошибку и собираем в метрику. Объект ↔ строка ↔ точка ↔ слагаемое связаны
-   подсветкой при наведении. Чистый vanilla JS, без зависимостей. */
+   Для каждой квартиры модель даёт прогноз цены (ŷ), факт сделки — (y), промах
+   e=y−ŷ превращаем в ошибку и собираем в метрику. Объект ↔ строка ↔ точка ↔
+   слагаемое связаны подсветкой при наведении. Чистый vanilla JS, без зависимостей. */
 (function () {
   "use strict";
 
@@ -79,7 +79,7 @@
   }
 
   // ---------- сборка метрик (KaTeX) ----------
-  let termEls = [];                       // индекс квартираа -> [DOM-элементы слагаемых]
+  let termEls = [];                       // индекс квартиры -> [DOM-элементы слагаемых]
   const KT = (tex) => (window.katex ? katex.renderToString("\\displaystyle " + tex, { throwOnError: false, trust: true, strict: false }) : tex);
   const tmpl = (rows) => `<div class="mtemplate">${rows.map(([l, t]) => `<div><span class="tag">${l}</span> ${t}</div>`).join("")}</div>`;
   function renderMetrics() {
@@ -116,6 +116,21 @@
       });
     });
   }
+  // ---------- ховер-ридаут под графиком потерь: e = y − ŷ, MSE, MAE, RMSE разом ----------
+  const KTS = (tex) => (window.katex ? katex.renderToString(tex, { throwOnError: false, strict: false }) : tex);
+  function renderReadout(i) {
+    const ro = $("#readout"); if (!ro) return;
+    const m = metrics(), A = approx(m.mae), S = approx(m.mse), R = approx(m.rmse);
+    const d = (i >= 0 && DATA[i] && !(state.dropOut && i === OUT)) ? DATA[i] : null;
+    const eCell = d
+      ? `<div class="rcell re"><span class="obj-tag">🏠 №${d.i + 1}</span>${KTS(`e = y - \\hat y = ${d.y} - ${d.g} = ${d.e}`)}</div>`
+      : `<div class="rcell re">${KTS("e = y - \\hat y")}</div>`;
+    ro.innerHTML =
+      eCell +
+      `<div class="rcell rmae">${KTS(`\\mathrm{MAE} ${A.eq === "=" ? "=" : "\\approx"} \\textcolor{#10b981}{${A.s}}`)}</div>` +
+      `<div class="rcell rmse">${KTS(`\\mathrm{MSE} ${S.eq === "=" ? "=" : "\\approx"} \\textcolor{#4f46e5}{${S.s}}`)}</div>` +
+      `<div class="rcell rrmse">${KTS(`\\mathrm{RMSE} \\approx \\textcolor{#8b5cf6}{${R.s}}`)}</div>`;
+  }
   function renderVerdict() {
     const all = metricsOf(DATA), cut = metricsOf(DATA.filter((d) => d.i !== OUT));
     const o = DATA[OUT];
@@ -138,7 +153,7 @@
       state.shown = i;
       tog(i, true);
     }
-    drawChart(); drawCurves();
+    renderReadout(i); drawChart(); drawCurves();
   }
   function setHover(i) { state.hover = i; if (state.pinned < 0) applyHL(i); }
   function setPin(i) { state.pinned = (state.pinned === i) ? -1 : (i >= 0 ? i : -1); applyHL(effIndex()); }
@@ -180,7 +195,7 @@
       ctx.beginPath(); ctx.arc(X, Yy, rad, 0, 7); ctx.fillStyle = REAL_C; ctx.fill();
       ctx.beginPath(); ctx.arc(X, Yg, rad, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = GUESS_C; ctx.stroke();
       if (!sq && d.ae > 0 && (!small || d.i === hi)) { ctx.globalAlpha = dim ? 0.3 : 1; ctx.fillStyle = "#475569"; ctx.font = "700 11px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.ae + "", X + 11, (Yg + Yy) / 2); }
-      // ось X: номер квартираа (всегда) + эмодзи
+      // ось X: номер квартиры (всегда) + эмодзи
       ctx.globalAlpha = dim ? 0.45 : 1; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
       ctx.font = (small ? 11 : 14) + "px -apple-system, sans-serif"; ctx.fillText("🏠", X, p.y + p.h + 19);
       ctx.fillStyle = d.i === hi ? "#14171c" : "#8a93a3"; ctx.font = (d.i === hi ? "700 " : "") + "11px -apple-system, sans-serif";
@@ -280,29 +295,29 @@
     // аккуратные подписи кривых (без «L = …»)
     absELabel(cctx, PX(0.9 * E) - 30, PY(0.9 * E) - 12, "#10b981");
     eSqLabel(cctx, PX(-0.66 * E) + 6, PY((0.66 * E) * (0.66 * E)), "#4f46e5");
-    // три метрики: MAE и MSE — средние высоты штрафа; RMSE — синяя высота, спроецированная на ось ошибок
+    // три метрики. MAE и RMSE — «типичные ошибки» (млн ₽): вертикали на оси e.
+    // MSE — средний квадрат (млн ₽)²: горизонталь на оси L. Точка (RMSE, MSE) на параболе
+    // показывает связь RMSE = √MSE — синяя высота, спроецированная обратно на ось ошибок.
     const mm = metrics();
-    const dashH = (yval, color, label) => {
-      if (yval > ymax + 1e-9) return;
-      const Y = PY(yval);
-      cctx.strokeStyle = color; cctx.lineWidth = 1.4; cctx.setLineDash([5, 4]);
+    const setDash = (col, w) => { cctx.strokeStyle = col; cctx.lineWidth = w; cctx.setLineDash([5, 4]); };
+    if (mm.mse <= ymax + 1e-9) {                          // MSE — горизонталь (ось штрафа L)
+      const Y = PY(mm.mse); setDash("#4f46e5", 1.5);
       cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.setLineDash([]);
-      cctx.fillStyle = color; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "right"; cctx.textBaseline = "bottom";
-      cctx.fillText(label, x0 + pw - 3, Y - 2);
-    };
-    dashH(mm.mae, "#10b981", "MAE = " + fmt(mm.mae));
-    dashH(mm.mse, "#4f46e5", "MSE = " + fmt(mm.mse));
-    if (mm.rmse <= E) {                                   // RMSE: вертикаль от точки (RMSE, MSE) на параболе вниз к оси
-      const X = PX(mm.rmse), Ytop = PY(mm.mse), Ybot = PY(0);
-      cctx.strokeStyle = "#8b5cf6"; cctx.lineWidth = 1.6; cctx.setLineDash([5, 4]);
-      cctx.beginPath(); cctx.moveTo(X, Ytop); cctx.lineTo(X, Ybot); cctx.stroke(); cctx.setLineDash([]);
-      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(X, Ytop, 3.5, 0, 7); cctx.fill();
-      cctx.font = "700 11px -apple-system, sans-serif"; cctx.textBaseline = "middle";
-      const lbl = "RMSE = " + fmt(mm.rmse), lw = cctx.measureText(lbl).width;
-      let lxp = X + 7, align = "left";
-      if (lxp + lw > x0 + pw) { lxp = X - 7; align = "right"; }
-      cctx.textAlign = align; cctx.fillText(lbl, lxp, Ytop - 8);
     }
+    [["#10b981", mm.mae], ["#8b5cf6", mm.rmse]].forEach(([col, val]) => {   // MAE, RMSE — вертикали (ось ошибок e)
+      if (val > E) return;
+      const X = PX(val); setDash(col, 1.6);
+      cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
+    });
+    if (mm.rmse <= E && mm.mse <= ymax + 1e-9) {          // точка связи RMSE ↔ MSE на параболе
+      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(PX(mm.rmse), PY(mm.mse), 4, 0, 7); cctx.fill();
+      cctx.strokeStyle = "#fff"; cctx.lineWidth = 1.5; cctx.stroke();
+    }
+    // подписи метрик — разведены, чтобы не наезжать друг на друга и на кривые
+    cctx.font = "700 11.5px -apple-system, sans-serif"; cctx.textBaseline = "top";
+    if (mm.mae <= E) { cctx.fillStyle = "#10b981"; cctx.textAlign = "right"; cctx.fillText("MAE = " + fmt(mm.mae) + " млн ₽", PX(mm.mae) - 5, y0 + 2); }
+    if (mm.rmse <= E) { cctx.fillStyle = "#8b5cf6"; cctx.textAlign = "left"; cctx.fillText("RMSE = " + fmt(mm.rmse) + " млн ₽", PX(mm.rmse) + 5, y0 + 2); }
+    if (mm.mse <= ymax + 1e-9) { cctx.fillStyle = "#4f46e5"; cctx.textAlign = "left"; cctx.textBaseline = "bottom"; cctx.fillText("MSE = " + fmt(mm.mse) + " (млн ₽)²", x0 + 5, PY(mm.mse) - 3); }
     // наши квартиры — точки на обеих кривых при своей ошибке e (вне видимого диапазона — пропускаем)
     const hi = effIndex();
     for (const d of pts) {
@@ -312,6 +327,9 @@
       cctx.beginPath(); cctx.arc(X, PY(d.se), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#4f46e5"; cctx.fill();
       cctx.beginPath(); cctx.arc(X, PY(Math.abs(d.e)), hot ? 6 : 4, 0, 7); cctx.fillStyle = "#10b981"; cctx.fill();
       cctx.globalAlpha = 1;
+      if (d.i === state.pinned) {                         // закреплено кликом — тёмное кольцо вокруг обеих точек
+        [PY(d.se), PY(Math.abs(d.e))].forEach((Y) => { cctx.strokeStyle = "#14171c"; cctx.lineWidth = 2; cctx.beginPath(); cctx.arc(X, Y, 8.5, 0, 7); cctx.stroke(); });
+      }
       if (hot) {
         cctx.strokeStyle = "rgba(20,23,28,.3)"; cctx.setLineDash([4, 4]); cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
         [["#4f46e5", d.se], ["#10b981", Math.abs(d.e)]].forEach(([c, v]) => { if (v > ymax) return; cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
@@ -322,11 +340,6 @@
         cctx.fillStyle = "#fff"; cctx.textAlign = "left"; cctx.textBaseline = "middle"; cctx.fillText(txt, tx + 8, y0 + 15);
       }
     }
-    // легенда
-    cctx.textAlign = "left"; cctx.textBaseline = "middle"; cctx.font = "12px -apple-system, sans-serif";
-    let lx = x0 + 8; const ly = y0 + 11;
-    const leg = (c, t) => { cctx.fillStyle = c; cctx.beginPath(); cctx.arc(lx + 5, ly, 5, 0, 7); cctx.fill(); cctx.fillStyle = "#14171c"; cctx.fillText(t, lx + 14, ly); lx += 14 + cctx.measureText(t).width + 16; };
-    leg("#10b981", "|e| → MAE"); leg("#4f46e5", "e² → MSE"); leg("#8b5cf6", "√MSE → RMSE");
   }
   function nearestCurve(mx) {
     if (!curveGeom) return -1;
@@ -344,7 +357,7 @@
   }
 
   // ---------- управление ----------
-  function renderAll() { renderTable(); renderMetrics(); renderVerdict(); drawChart(); drawCurves(); }
+  function renderAll() { renderTable(); renderMetrics(); renderVerdict(); renderReadout(effIndex()); drawChart(); drawCurves(); }
   function rebuild() { generate(); state.hover = -1; state.pinned = -1; state.shown = -1; renderAll(); }
 
   $("#viewSeg").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
@@ -352,7 +365,7 @@
     state.view = b.dataset.view; drawChart();
   }));
   $("#dropOut").addEventListener("change", (e) => {
-    state.dropOut = e.target.checked; renderTable(); renderMetrics(); renderVerdict(); drawChart(); drawCurves();
+    state.dropOut = e.target.checked; renderTable(); renderMetrics(); renderVerdict(); renderReadout(effIndex()); drawChart(); drawCurves();
   });
   $("#count").addEventListener("input", (e) => {
     state.n = +e.target.value; $("#countVal").textContent = e.target.value;
@@ -362,8 +375,11 @@
     state.seed = (state.seed * 1103515245 + 12345) >>> 0;
     state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
+  function qualityWord(g) { return g < 0.34 ? "слабая" : g < 0.67 ? "средняя" : "сильная"; } // g = «доброта» = 1−q
   $("#quality").addEventListener("input", (e) => {
-    state.quality = +e.target.value / 100;
+    const g = +e.target.value / 100;            // вправо = лучше модель
+    state.quality = 1 - g;
+    $("#qualityVal").textContent = qualityWord(g);
     state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
   // зум графика потерь: кнопки − / 1:1 / + и колесо мыши над холстом
@@ -377,5 +393,5 @@
   window.addEventListener("resize", () => { resize(); resizeCurves(); });
 
   // ---------- старт ----------
-  generate(); renderTable(); renderMetrics(); renderVerdict(); resize(); resizeCurves();
+  generate(); renderTable(); renderMetrics(); renderVerdict(); renderReadout(-1); resize(); resizeCurves();
 })();

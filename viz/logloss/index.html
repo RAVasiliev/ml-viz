@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Log Loss / кросс-энтропия — насколько модель уверена? — ML-виз</title>
+  <title>Log-loss — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
   <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
@@ -29,7 +29,9 @@
     .grid2 { display:grid; grid-template-columns:1.35fr 1fr; gap:20px; align-items:start; }
     @media (max-width:920px){ .grid2{ grid-template-columns:1fr; } }
 
+    .table-wrap { max-height:360px; overflow:auto; border:1px solid var(--line); border-radius:10px; }
     table.calc { width:100%; border-collapse:collapse; font-size:13px; }
+    table.calc thead th { position:sticky; top:0; background:var(--surface); z-index:1; }
     table.calc th, table.calc td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; font-family:var(--mono); }
     table.calc th { font-size:11px; color:var(--faint); font-weight:650; font-family:var(--font); }
     table.calc td.obj, table.calc th.obj { text-align:left; font-family:var(--font); }
@@ -71,17 +73,17 @@
 
   <main class="lab" style="max-width:1180px">
     <div class="lab-head">
-      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · Log Loss / кросс-энтропия</div>
-      <h1>Log Loss: насколько модель уверена?</h1>
-      <p class="lead">Тут модель не просто говорит «болен/здоров», а называет <b>вероятность</b>, что человек болен. <b>Log Loss</b> (бинарная кросс-энтропия) штрафует не за «не угадал», а за <b>плохую уверенность</b>: угадал уверенно — почти 0; засомневался — заметный штраф; <b class="sick">уверенно ошибся</b> — штраф огромный. <b>Тащи точки</b> — меняй уверенность модели и смотри, как растёт штраф.</p>
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Классификация · Log-loss</div>
+      <h1>Log-loss</h1>
+      <p class="lead">Модель называет <b>вероятность</b> <span style="font-family:var(--mono)">p̂</span>, что человек болен. <b>Log-loss</b> (бинарная кросс-энтропия) штрафует не сам факт ошибки, а <b>уверенность</b>: за каждого человека берётся <span style="font-family:var(--mono)">−ln</span> вероятности, которую модель дала верному ответу. Угадала уверенно — штраф около 0; засомневалась (<span style="font-family:var(--mono)">p̂≈0.5</span>) — около 0.69; <b class="sick">уверенно ошиблась</b> — штраф взлетает, потому что логарифм у нуля уходит в бесконечность. <b>Тащи точки</b> и смотри, как меняется штраф.</p>
     </div>
 
     <div class="controls-bar">
-      <label class="ctl">Пациентов: <input type="range" id="count" min="3" max="30" step="1" value="5" /><b id="countVal">5</b></label>
-      <label class="ctl">Качество модели: <span style="color:#10b981;font-weight:700">хорошее</span> <input type="range" id="quality" min="0" max="100" step="1" value="35" /> <span style="color:#ef4444;font-weight:700">плохое</span></label>
+      <label class="ctl">Пациентов <input type="range" id="count" min="3" max="30" step="1" value="5" /><b id="countVal">5</b></label>
+      <label class="ctl">Качество модели <input type="range" id="quality" min="0" max="100" step="1" value="65" /><b id="qualityVal">средняя</b></label>
       <button class="btn" id="newData" style="flex:none">🎲 Новые пациенты</button>
-      <span class="hint-inline">🖐 тащи точку влево/вправо — меняешь вероятность, которую модель дала человеку</span>
     </div>
+    <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> тащи точку влево/вправо — меняешь вероятность, которую модель дала человеку.</span></div>
 
     <div class="grid2" style="margin-top:18px">
       <div>
@@ -90,9 +92,11 @@
       </div>
       <div>
         <div class="section-title" style="margin-top:0">Таблица: штраф каждого пациента</div>
-        <table class="calc"><thead>
-          <tr><th class="obj">пациент</th><th>факт y</th><th>p̂ (модель)</th><th class="pen-c">штраф −ln</th></tr>
-        </thead><tbody id="tbody"></tbody></table>
+        <div class="table-wrap">
+          <table class="calc"><thead>
+            <tr><th class="obj">пациент</th><th>факт y</th><th>p̂ (модель)</th><th class="pen-c">штраф −ln</th></tr>
+          </thead><tbody id="tbody"></tbody></table>
+        </div>
         <div class="legend-terms">
           <span><i class="sick">красное</i> слагаемое = штраф больного <span style="font-family:var(--mono)">−ln p̂</span></span>
           <span><i class="healthy">зелёное</i> слагаемое = штраф здорового <span style="font-family:var(--mono)">−ln(1−p̂)</span></span>
@@ -100,9 +104,9 @@
       </div>
     </div>
 
-    <div class="section-title">Из штрафов — в Log Loss</div>
+    <div class="section-title">Из штрафов — в Log-loss</div>
     <div class="formula-box">
-      <div class="mhead-ll"><span class="mname-ll">Log Loss</span><span class="mq-ll">бинарная кросс-энтропия · binary cross-entropy</span></div>
+      <div class="mhead-ll"><span class="mname-ll">Log-loss</span><span class="mq-ll">бинарная кросс-энтропия · binary cross-entropy</span></div>
       <div class="kf" data-tex="\mathrm{LogLoss}=-\frac1N\sum_{i=1}^{N}\big[\,\textcolor{#ef4444}{y_i\ln p_i}+\textcolor{#10b981}{(1-y_i)\ln(1-p_i)}\,\big]" data-block></div>
 
       <div class="bd">

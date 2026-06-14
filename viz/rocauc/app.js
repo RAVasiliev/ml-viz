@@ -269,7 +269,7 @@
   $("#count").addEventListener("input", (e) => { stopAnim(); state.count = +e.target.value; $("#countVal").textContent = e.target.value; rebuild(); });
   $("#sep").addEventListener("input", (e) => {
     stopAnim(); state.sep = +e.target.value;
-    $("#sepVal").textContent = state.sep < 0.12 ? "слабый" : state.sep < 0.28 ? "ср." : "сильный";
+    $("#sepVal").textContent = state.sep < 0.12 ? "слабая" : state.sep < 0.28 ? "средняя" : "сильная";
     rebuild();
   });
   $("#newData").addEventListener("click", () => { stopAnim(); state.seed = (state.seed * 1103515245 + 12345) >>> 0; rebuild(); });
@@ -277,7 +277,12 @@
   $("#zoomReset").addEventListener("click", () => { resetView(); drawROC(); });
   window.addEventListener("resize", resize);
 
+  // ---------- KaTeX ----------
+  document.querySelectorAll('.kf[data-tex]').forEach((e) => {
+    try { katex.render(e.dataset.tex, e, { throwOnError: false, trust: true, strict: false, displayMode: e.dataset.block != null }); } catch (err) {}
+  });
+
   // ---------- старт ----------
-  $("#sepVal").textContent = "ср.";
+  $("#sepVal").textContent = "средняя";
   generate(); renderTable(); resize(); renderAll();
 })();

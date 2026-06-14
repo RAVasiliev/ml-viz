@@ -1,4 +1,4 @@
-/* «Log Loss / кросс-энтропия» — насколько хороши вероятности модели.
+/* «Log-loss» (бинарная кросс-энтропия) — насколько хороши вероятности модели.
    Пациенты: истинный диагноз (болен=1 / здоров=0) и вероятность p̂ от модели.
    Штраф = −log p̂ (если болен) или −log(1−p̂) (если здоров). Точки тащим по
    кривой штрафа; уверенная ошибка → огромный штраф. Vanilla JS + KaTeX. */
@@ -36,29 +36,6 @@
   }
   const loss = (d) => (d.sick ? -Math.log(clamp(d.p, 1e-3, 1)) : -Math.log(clamp(1 - d.p, 1e-3, 1)));
   const total = () => PPL.reduce((s, d) => s + loss(d), 0) / PPL.length;
-
-  // ---------- карточки ----------
-  let cards = [];
-  function renderCards() {
-    const wrap = $("#pstrip"); wrap.innerHTML = ""; cards = [];
-    PPL.forEach((d, i) => {
-      const el = document.createElement("div");
-      el.className = "pcard " + (d.sick ? "sickb" : "healthyb");
-      el.dataset.i = i;
-      const L = loss(d);
-      const penCol = L < 0.4 ? "#0f9d58" : L < 1.2 ? "#b45309" : "#dc2626";
-      el.innerHTML =
-        `<div class="emoji">${d.sick ? "🤒" : "🙂"}</div>` +
-        `<div class="num">№${i + 1}</div>` +
-        `<div class="who ${d.sick ? "s" : "h"}">${d.sick ? "болен" : "здоров"}</div>` +
-        `<div class="prob">p̂ = ${Math.round(d.p * 100)}%</div>` +
-        `<div class="pen" style="color:${penCol}">штраф ${fmt(L)}</div>`;
-      el.addEventListener("mouseenter", () => setHover(i));
-      el.addEventListener("mouseleave", () => setHover(-1));
-      el.addEventListener("click", () => setPin(i));
-      wrap.appendChild(el); cards[i] = el;
-    });
-  }
 
   // ---------- таблица ----------
   let rows = [];
@@ -125,9 +102,9 @@
     const w = PPL[worst], L = loss(w), conf = w.sick ? 1 - w.p : w.p;
     const confWrong = (w.sick && w.p < 0.4) || (!w.sick && w.p > 0.6);
     const msg = confWrong
-      ? `Худший — пациент №${worst + 1}: он <b>${w.sick ? "болен" : "здоров"}</b>, а модель уверенно сказала обратное (p̂ = ${Math.round(w.p * 100)}%) → штраф <b style="color:#dc2626">${fmt(L)}</b>. Вот она, «уверенная ошибка»: Log Loss наказывает её несоизмеримо.`
+      ? `Худший — пациент №${worst + 1}: он <b>${w.sick ? "болен" : "здоров"}</b>, а модель уверенно сказала обратное (p̂ = ${Math.round(w.p * 100)}%) → штраф <b style="color:#dc2626">${fmt(L)}</b>. Один такой случай весит больше десятка умеренных ошибок.`
       : `Пока никто не ошибся уверенно — штрафы умеренные. Перетащи больного к низкой вероятности (или здорового к высокой), и увидишь, как штраф взлетает.`;
-    $("#verdict").innerHTML = `${msg} Средний штраф = <b style="color:${PEN}">Log Loss ≈ ${fmt(total())}</b>. Идеал — 0 (модель уверенно права на всех).`;
+    $("#verdict").innerHTML = `${msg} Средний штраф = <b style="color:${PEN}">Log-loss ≈ ${fmt(total())}</b>. Идеал — 0 (модель уверенно права на всех).`;
   }
 
   // ---------- подсветка ----------
@@ -136,7 +113,6 @@
     if (i !== state.shown) {
       const tog = (idx, add) => {
         if (idx < 0) return;
-        if (cards[idx]) cards[idx].classList.toggle("hl", add);
         if (rows[idx]) rows[idx].classList.toggle("hl", add);
         (termEls[idx] || []).forEach((e) => e.classList.toggle("hl", add));
       };
@@ -180,7 +156,7 @@
     ctx.font = "11px -apple-system, system-ui, sans-serif"; ctx.fillStyle = "#8a93a3"; ctx.strokeStyle = "rgba(20,23,28,.06)"; ctx.lineWidth = 1;
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (let v = 0; v <= 4; v++) { const Y = py(v); ctx.beginPath(); ctx.moveTo(pl.x, Y); ctx.lineTo(pl.x + pl.w, Y); ctx.stroke(); ctx.fillText(v, pl.x - 7, Y); }
-    ctx.save(); ctx.translate(13, pl.y + pl.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("штраф (Log Loss)", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(13, pl.y + pl.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("штраф (Log-loss)", 0, 0); ctx.restore();
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const t of [0, 0.25, 0.5, 0.75, 1]) ctx.fillText(t.toFixed(2), px(t), base + 6);
     ctx.fillText("вероятность p̂, что человек болен (мнение модели)", pl.x + pl.w / 2, base + 24);
@@ -240,7 +216,12 @@
   function refresh() { renderTable(); renderTotal(); renderVerdict(); draw(); }
   function rebuild() { generate(); state.hover = -1; state.pinned = -1; state.shown = -1; refresh(); }
   $("#count").addEventListener("input", (e) => { state.count = +e.target.value; $("#countVal").textContent = e.target.value; rebuild(); });
-  $("#quality").addEventListener("input", (e) => { state.quality = +e.target.value / 100; rebuild(); });
+  $("#quality").addEventListener("input", (e) => {
+    const g = +e.target.value / 100;            // вправо = лучше модель
+    state.quality = 1 - g;
+    $("#qualityVal").textContent = g < 0.34 ? "слабая" : g < 0.67 ? "средняя" : "сильная";
+    rebuild();
+  });
   $("#newData").addEventListener("click", () => { state.seed = (state.seed * 1103515245 + 12345) >>> 0; rebuild(); });
   window.addEventListener("resize", resize);
 

@@ -658,7 +658,7 @@
     view = v;
     document.querySelectorAll(".vtab").forEach((t) => t.classList.toggle("active", t.dataset.view === v));
     hintEl.textContent = v === "3d"
-      ? "Тяни мышью — повернуть поверхность"
+      ? "Тяни — повернуть · клик по поверхности — задать старт"
       : (fn && fn.isData ? "Клик — задать стартовые (w, b)" : "Клик по полю — задать стартовую точку");
     legendNote.textContent = v === "3d"
       ? "поверхность L — высота = потери (лог-сжатие), красная нить — путь спуска"
@@ -704,10 +704,19 @@
   multiChk.addEventListener("change", () => { multi = multiChk.checked; multiCountCtrl.style.display = multi ? "" : "none"; rebuild(); });
   multiCountRange.addEventListener("input", () => { multiCount = +multiCountRange.value; multiCountVal.textContent = multiCount; if (multi) rebuild(); });
 
-  // клик по полю (только 2D) — задать стартовую точку
+  // клик по полю — задать стартовую точку (работает и в 2D, и в 3D)
   canvas.addEventListener("click", (e) => {
-    if (view !== "2d" || dragMoved || multi) return;
+    if (dragMoved || multi) return;
     const rect = canvas.getBoundingClientRect();
+    if (view === "3d") {
+      // 3D: ищем вершину сетки проекции, ближайшую к курсору, и берём её (u,v)
+      if (!grid3d) return;
+      const hit = GD3D.pick(grid3d, cam, W, H, e.clientX - rect.left, e.clientY - rect.top);
+      if (!hit) return;
+      start = { u: hit.u, v: hit.v };
+      rebuild();
+      return;
+    }
     const p = plot();
     if (p.size <= 0) return;
     const nx = (e.clientX - rect.left - p.ox) / p.size;

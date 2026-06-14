@@ -289,7 +289,7 @@
   function rebuild() { generate(); draw(); draw2(); update(); }
   $("#sep").addEventListener("input", (e) => {
     state.sep = +e.target.value;
-    $("#sepVal").textContent = state.sep < 0.15 ? "слабый" : state.sep < 0.3 ? "ср." : "сильный";
+    $("#sepVal").textContent = state.sep < 0.15 ? "слабая" : state.sep < 0.3 ? "средняя" : "сильная";
     rebuild();
   });
   $("#bal").addEventListener("input", (e) => { state.balance = +e.target.value; $("#balVal").textContent = Math.round(state.balance * 100) + "%"; rebuild(); });
@@ -299,8 +299,8 @@
   // ---------- старт ----------
   // KaTeX-набор инлайн-формул в лиде (s(x), τ, ŷ = 1[s≥τ], y∈{0,1})
   document.querySelectorAll('.kf[data-tex]').forEach((e) => {
-    try { katex.render(e.dataset.tex, e, { throwOnError: false, trust: true, strict: false }); } catch (err) {}
+    try { katex.render(e.dataset.tex, e, { throwOnError: false, trust: true, strict: false, displayMode: e.dataset.block != null }); } catch (err) {}
   });
-  $("#sepVal").textContent = "ср.";
+  $("#sepVal").textContent = "средняя";
   generate(); resize(); update();
 })();
