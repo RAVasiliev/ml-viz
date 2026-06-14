@@ -30,13 +30,20 @@
     /* формулы KaTeX */
     .kf { margin: 8px 0; overflow-x: auto; overflow-y: hidden; }
     .kf .katex { font-size: 1.05em; white-space: nowrap; }
-    /* блок «как это работает» под лидом */
-    .gd-explain { margin: 14px 0 4px; }
-    .gd-explain h2 { font-size: 13.5px; font-weight: 700; color: var(--ink); margin: 16px 0 6px; }
-    .gd-explain p { font-size: 14px; line-height: 1.55; color: var(--muted); max-width: none; margin: 6px 0; }
-    .gd-explain ul { margin: 6px 0; padding-left: 18px; }
-    .gd-explain li { font-size: 14px; line-height: 1.5; color: var(--muted); margin: 3px 0; }
-    .gd-explain li b { color: var(--ink); }
+    /* раскрывающиеся блоки с подробностями (как в roc / rocauc) */
+    .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 4px; }
+    @media (max-width:820px){ .cats { grid-template-columns:1fr; } }
+    .cat { border:1px solid var(--line); border-radius:11px; background:var(--surface); box-shadow:var(--shadow-sm); }
+    .cat > summary { cursor:pointer; padding:11px 15px; font-weight:650; font-size:14px; list-style:none; display:flex; align-items:center; gap:9px; color:var(--ink); }
+    .cat > summary::-webkit-details-marker { display:none; }
+    .cat > summary::before { content:"▸"; color:var(--accent); font-size:12px; transition:transform .15s; }
+    .cat[open] > summary::before { transform:rotate(90deg); }
+    .cat .cb { padding:0 16px 14px; font-size:13.5px; line-height:1.6; color:var(--muted); }
+    .cat .cb p { font-size:13.5px; line-height:1.6; color:var(--muted); margin:6px 0; max-width:none; }
+    .cat .cb ul { margin:6px 0; padding-left:18px; }
+    .cat .cb li { font-size:13.5px; line-height:1.55; color:var(--muted); margin:5px 0; }
+    .cat .cb b { color:var(--ink); }
+    .cat .cb .kf { margin:8px 0; }
     .stage-top {
       display: flex; align-items: center; justify-content: space-between;
       gap: 12px; margin: 0 2px 10px; min-height: 24px;
@@ -109,31 +116,41 @@
     <div class="lab-head">
       <div class="crumbs"><a href="../../index.html">ML-виз</a> · Оптимизация · Градиентный спуск</div>
       <h1>Градиентный спуск</h1>
-      <p>Метод подбирает параметры <span class="formula">θ</span> так, чтобы функция потерь <span class="formula">L(θ)</span> стала минимальной. Из текущей точки делаем шаг против градиента — в сторону самого быстрого убывания. Рельеф на поле — это сама поверхность потерь: заливка и линии уровня показывают, где L больше, где меньше; чем гуще изолинии, тем круче склон.</p>
+      <p>Метод подбирает параметры <span class="formula">θ</span> так, чтобы функция потерь <span class="formula">L(θ)</span> стала минимальной. Из текущей точки делаем шаг против градиента — в сторону самого быстрого убывания. Рельеф на поле — это сама поверхность потерь: заливка и линии уровня показывают, где <span class="formula">L</span> больше, где меньше. Подробности — в блоках ниже.</p>
 
-      <div class="gd-explain">
-        <h2>Шаг спуска</h2>
-        <p>Градиент <span class="formula">∇L(θ)</span> указывает в сторону роста потерь, поэтому идём в противоположную:</p>
-        <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\nabla L(\theta)" data-block></div>
-        <p><b>Learning rate</b> <span class="formula">η</span> — длина шага. Слишком маленький — спуск ползёт сотни итераций; слишком большой — точка перепрыгивает дно, осциллирует поперёк оврага и уходит в расходимость.</p>
-
-        <h2>Как считаем градиент</h2>
-        <p>Потери обычно складываются из ошибок на отдельных объектах. Полный градиент усредняет по всей выборке; стохастические варианты берут только часть — шаг считается быстрее, но шумит.</p>
-        <ul>
-          <li><b>Full Gradient</b> — по всем <span class="formula">N</span> объектам. Точное направление, гладкая траектория, но каждый шаг дорогой:
-            <div class="kf" data-tex="\nabla L(\theta)=\frac{1}{N}\sum_{i=1}^{N}\nabla \ell_i(\theta)" data-block></div>
-          </li>
-          <li><b>SGD</b> — по одному случайному объекту <span class="formula">i</span>. Шаги дешёвые и шумные; шум помогает выскакивать из мелких локальных ям:
-            <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\nabla \ell_i(\theta)" data-block></div>
-          </li>
-          <li><b>Mini-batch</b> — по случайной части <span class="formula">B</span> размера <span class="formula">m</span>. Компромисс: устойчивее SGD, дешевле полного градиента:
-            <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\frac{1}{m}\sum_{i\in B}\nabla \ell_i(\theta)" data-block></div>
-          </li>
-        </ul>
-
-        <h2>Импульс (momentum)</h2>
-        <p>Накапливаем направление прошлых шагов в скорости <span class="formula">v</span> и движемся по ней. В узких оврагах это гасит поперечные колебания и разгоняет спуск вдоль дна; <span class="formula">β</span> задаёт «инерцию» (чем больше, тем тяжелее шар):</p>
-        <div class="kf" data-tex="v \leftarrow \beta\,v + \nabla L(\theta), \qquad \theta \leftarrow \theta - \eta\,v" data-block></div>
+      <div class="cats">
+        <details class="cat">
+          <summary>Шаг спуска и learning rate</summary>
+          <div class="cb">
+            <p>Градиент <span class="formula">∇L(θ)</span> указывает в сторону роста потерь, поэтому идём в противоположную:</p>
+            <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\nabla L(\theta)" data-block></div>
+            <p><b>Learning rate</b> <span class="formula">η</span> — длина шага. Слишком маленький — спуск ползёт сотни итераций; слишком большой — точка перепрыгивает дно, осциллирует поперёк оврага и уходит в расходимость.</p>
+          </div>
+        </details>
+        <details class="cat">
+          <summary>Как считаем градиент: Full / SGD / Mini-batch</summary>
+          <div class="cb">
+            <p>Потери складываются из ошибок на отдельных объектах. Полный градиент усредняет по всей выборке; стохастические варианты берут только часть — шаг дешевле, но шумит.</p>
+            <ul>
+              <li><b>Full Gradient</b> — по всем <span class="formula">N</span> объектам. Точное направление, гладкая траектория, но каждый шаг дорогой:
+                <div class="kf" data-tex="\nabla L(\theta)=\frac{1}{N}\sum_{i=1}^{N}\nabla \ell_i(\theta)" data-block></div>
+              </li>
+              <li><b>SGD</b> — по одному случайному объекту <span class="formula">i</span>. Шаги дешёвые и шумные; шум помогает выскакивать из мелких локальных ям:
+                <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\nabla \ell_i(\theta)" data-block></div>
+              </li>
+              <li><b>Mini-batch</b> — по случайной части <span class="formula">B</span> размера <span class="formula">m</span>. Компромисс: устойчивее SGD, дешевле полного градиента:
+                <div class="kf" data-tex="\theta \leftarrow \theta - \eta\,\frac{1}{m}\sum_{i\in B}\nabla \ell_i(\theta)" data-block></div>
+              </li>
+            </ul>
+          </div>
+        </details>
+        <details class="cat">
+          <summary>Импульс (momentum)</summary>
+          <div class="cb">
+            <p>Накапливаем направление прошлых шагов в скорости <span class="formula">v</span> и движемся по ней. В узких оврагах это гасит поперечные колебания и разгоняет спуск вдоль дна; <span class="formula">β</span> задаёт «инерцию» (чем больше, тем тяжелее шар):</p>
+            <div class="kf" data-tex="v \leftarrow \beta\,v + \nabla L(\theta), \qquad \theta \leftarrow \theta - \eta\,v" data-block></div>
+          </div>
+        </details>
       </div>
 
       <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> клик по полю задаёт стартовую точку (в 2D и в 3D), бегунки меняют шаг η, импульс β и режим градиента, а «Запуск» гонит спуск по рельефу.</span></div>

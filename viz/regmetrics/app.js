@@ -295,29 +295,27 @@
     // аккуратные подписи кривых (без «L = …»)
     absELabel(cctx, PX(0.9 * E) - 30, PY(0.9 * E) - 12, "#10b981");
     eSqLabel(cctx, PX(-0.66 * E) + 6, PY((0.66 * E) * (0.66 * E)), "#4f46e5");
-    // три метрики. MAE и RMSE — «типичные ошибки» (млн ₽): вертикали на оси e.
-    // MSE — средний квадрат (млн ₽)²: горизонталь на оси L. Точка (RMSE, MSE) на параболе
-    // показывает связь RMSE = √MSE — синяя высота, спроецированная обратно на ось ошибок.
+    // Три метрики на одном поле. MAE и MSE — «средние высоты» своих кривых: горизонтали
+    // на оси штрафа L (млн ₽ и (млн ₽)²). RMSE = √MSE — спускаем перпендикуляр из точки,
+    // где горизонталь MSE встречает параболу, обратно на ось ошибок: это и есть RMSE в млн ₽.
     const mm = metrics();
-    const setDash = (col, w) => { cctx.strokeStyle = col; cctx.lineWidth = w; cctx.setLineDash([5, 4]); };
-    if (mm.mse <= ymax + 1e-9) {                          // MSE — горизонталь (ось штрафа L)
-      const Y = PY(mm.mse); setDash("#4f46e5", 1.5);
-      cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.setLineDash([]);
-    }
-    [["#10b981", mm.mae], ["#8b5cf6", mm.rmse]].forEach(([col, val]) => {   // MAE, RMSE — вертикали (ось ошибок e)
-      if (val > E) return;
-      const X = PX(val); setDash(col, 1.6);
-      cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
-    });
-    if (mm.rmse <= E && mm.mse <= ymax + 1e-9) {          // точка связи RMSE ↔ MSE на параболе
-      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(PX(mm.rmse), PY(mm.mse), 4, 0, 7); cctx.fill();
+    const maeIn = mm.mae <= ymax + 1e-9, mseIn = mm.mse <= ymax + 1e-9, rmseIn = mseIn && mm.rmse <= E;
+    const hline = (col, y, w) => { cctx.strokeStyle = col; cctx.lineWidth = w; cctx.setLineDash([5, 4]); const Y = PY(y); cctx.beginPath(); cctx.moveTo(x0, Y); cctx.lineTo(x0 + pw, Y); cctx.stroke(); cctx.setLineDash([]); };
+    if (mseIn) hline("#4f46e5", mm.mse, 1.6);             // MSE — средняя высота параболы e²
+    if (maeIn) hline("#10b981", mm.mae, 1.6);             // MAE — средняя высота галочки |e|
+    if (rmseIn) {                                          // RMSE = √MSE: перпендикуляр с параболы на ось ошибок e
+      const Xr = PX(mm.rmse), Ym = PY(mm.mse), Yb = PY(0);
+      cctx.strokeStyle = "#8b5cf6"; cctx.lineWidth = 1.8; cctx.setLineDash([5, 4]);
+      cctx.beginPath(); cctx.moveTo(Xr, Ym); cctx.lineTo(Xr, Yb); cctx.stroke(); cctx.setLineDash([]);
+      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(Xr, Ym, 4.5, 0, 7); cctx.fill();   // угол (RMSE, MSE) на параболе
       cctx.strokeStyle = "#fff"; cctx.lineWidth = 1.5; cctx.stroke();
+      cctx.fillStyle = "#8b5cf6"; cctx.beginPath(); cctx.arc(Xr, Yb, 3, 0, 7); cctx.fill();      // основание на оси e: e = RMSE
     }
-    // подписи метрик — разведены, чтобы не наезжать друг на друга и на кривые
-    cctx.font = "700 11.5px -apple-system, sans-serif"; cctx.textBaseline = "top";
-    if (mm.mae <= E) { cctx.fillStyle = "#10b981"; cctx.textAlign = "right"; cctx.fillText("MAE = " + fmt(mm.mae) + " млн ₽", PX(mm.mae) - 5, y0 + 2); }
-    if (mm.rmse <= E) { cctx.fillStyle = "#8b5cf6"; cctx.textAlign = "left"; cctx.fillText("RMSE = " + fmt(mm.rmse) + " млн ₽", PX(mm.rmse) + 5, y0 + 2); }
-    if (mm.mse <= ymax + 1e-9) { cctx.fillStyle = "#4f46e5"; cctx.textAlign = "left"; cctx.textBaseline = "bottom"; cctx.fillText("MSE = " + fmt(mm.mse) + " (млн ₽)²", x0 + 5, PY(mm.mse) - 3); }
+    // подписи метрик — горизонтали подписаны у разных краёв, чтобы не наезжать
+    cctx.font = "700 11.5px -apple-system, sans-serif";
+    if (mseIn) { cctx.fillStyle = "#4f46e5"; cctx.textAlign = "left"; cctx.textBaseline = "bottom"; cctx.fillText("MSE = " + fmt(mm.mse) + " (млн ₽)²", x0 + 5, PY(mm.mse) - 4); }
+    if (maeIn) { cctx.fillStyle = "#10b981"; cctx.textAlign = "left"; cctx.textBaseline = "bottom"; cctx.fillText("MAE = " + fmt(mm.mae) + " млн ₽", x0 + 5, PY(mm.mae) - 4); }
+    if (rmseIn) { cctx.fillStyle = "#8b5cf6"; cctx.textAlign = "left"; cctx.textBaseline = "top"; cctx.fillText("RMSE = √MSE ≈ " + fmt(mm.rmse) + " млн ₽", PX(mm.rmse) + 7, PY(mm.mse) + 5); }
     // наши квартиры — точки на обеих кривых при своей ошибке e (вне видимого диапазона — пропускаем)
     const hi = effIndex();
     for (const d of pts) {

@@ -60,16 +60,6 @@
     .curve-host { position:relative; width:100%; height:300px; border-radius:12px; border:1px solid var(--line);
       background:var(--surface-2); overflow:hidden; }
     .curve-host canvas { position:absolute; inset:0; width:100%; height:100%; cursor:default; }
-    /* ховер-ридаут под графиком потерь: e, MSE, MAE, RMSE разом */
-    .readout { display:flex; flex-wrap:wrap; gap:8px 10px; align-items:center; margin-top:10px; min-height:34px; }
-    .readout .rcell { display:inline-flex; align-items:baseline; gap:6px; background:var(--surface); border:1px solid var(--line);
-      border-radius:9px; padding:6px 11px; font-size:13px; box-shadow:var(--shadow-sm); }
-    .readout .rcell .katex { font-size:1.06em; }
-    .readout .rcell.re { border-color:#cbd5e1; }
-    .readout .rcell.rmae { border-color:#10b981; }
-    .readout .rcell.rmse { border-color:#4f46e5; }
-    .readout .rcell.rrmse { border-color:#8b5cf6; }
-    .readout .obj-tag { font-size:12.5px; color:var(--faint); font-weight:600; margin-right:2px; }
 
     /* формулы KaTeX */
     .metric-eq { display:flex; align-items:baseline; flex-wrap:nowrap; gap:4px; overflow-x:auto; overflow-y:hidden; padding:6px 2px 6px 0; }
@@ -157,10 +147,9 @@
       <span class="hint-inline">или колесо мыши над графиком</span>
     </div>
     <div class="curve-host"><canvas id="curves"></canvas></div>
-    <div class="readout" id="readout"></div>
   </main>
 
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=5"></script>
   <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null});}catch(err){}});</script>
 </body>
 </html>
