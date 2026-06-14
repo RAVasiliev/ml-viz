@@ -1,5 +1,5 @@
 /* «Насколько мы промахнулись? MAE / MSE / RMSE» — детски-понятная страница.
-   Угадываем вес арбузов (ŷ), кладём на весы (y), промах e=y−ŷ превращаем
+   Угадываем вес квартираов (ŷ), кладём на весы (y), промах e=y−ŷ превращаем
    в ошибку и собираем в метрику. Объект ↔ строка ↔ точка ↔ слагаемое связаны
    подсветкой при наведении. Чистый vanilla JS, без зависимостей. */
 (function () {
@@ -9,7 +9,7 @@
   const GUESS_C = "#0ea5e9", REAL_C = "#334155";
   const $ = (s) => document.querySelector(s);
 
-  const state = { n: 8, seed: 7, view: "bars", dropOut: false, hover: -1, pinned: -1, shown: -1 };
+  const state = { n: 8, seed: 7, quality: 0.4, view: "bars", dropOut: false, hover: -1, pinned: -1, shown: -1 };
   let DATA = [];     // [{i,g,y,e,ae,se}]
   let OUT = -1;      // индекс грубого промаха
 
@@ -21,19 +21,22 @@
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
-  // генерируем n арбузов: факт y (5..12 кг), угадал g; у одного — грубый промах ±7 кг
+  // генерируем n квартир: факт y (стоимость, млн ₽), прогноз g; ошибки крупные и без нулей, у одной — грубый промах
   function generate() {
     const rng = mulberry32(state.seed), n = state.n;
     DATA = []; OUT = Math.floor(rng() * n);
+    const q = state.quality;                                      // 0 — хорошая модель, 1 — плохая
+    const baseNormal = 1 + q * 7, baseOut = 3 + q * 14;           // масштаб обычной ошибки и выброса
     for (let i = 0; i < n; i++) {
-      const y = 5 + Math.floor(rng() * 8);
-      let g;
-      if (i === OUT) g = (y >= 8) ? y - 7 : y + 7;        // явный промах на 7 кг
-      else g = y + (Math.round(rng() * 4) - 2);           // обычный промах −2..+2
-      g = Math.max(1, Math.min(15, g));
+      const y = 8 + Math.floor(rng() * 12);                       // факт 8..19 млн ₽
+      const base = (i === OUT) ? baseOut : baseNormal;
+      const mag = Math.max(1, Math.round(base * (0.6 + rng() * 0.8))); // крупнее при плохой модели, без нуля
+      let g = (rng() < 0.5) ? y - mag : y + mag;                  // направление промаха — случайно
+      if (g < 1) g = y + mag;                                     // прогноз держим ≥ 1
       const e = y - g;
       DATA.push({ i, g, y, e, ae: Math.abs(e), se: e * e });
     }
+    YMAX = Math.max(16, Math.ceil(Math.max(...DATA.flatMap((d) => [d.y, d.g])) / 4) * 4);
   }
 
   const active = () => DATA.filter((d) => !(state.dropOut && d.i === OUT));
@@ -61,7 +64,7 @@
       const sgn = d.e > 0 ? "pos" : d.e < 0 ? "neg" : "zero";
       const eTxt = d.e > 0 ? "+" + d.e : d.e === 0 ? "0 🎯" : String(d.e);
       tr.innerHTML =
-        `<td class="obj">🍉 №${d.i + 1}</td><td>${d.g}</td><td>${d.y}</td>` +
+        `<td class="obj">🏠 №${d.i + 1}</td><td>${d.g}</td><td>${d.y}</td>` +
         `<td class="${sgn}">${eTxt}</td><td class="mae">${d.ae}</td><td class="mse">${d.se}</td>`;
       tr.addEventListener("mouseenter", () => setHover(d.i));
       tr.addEventListener("mouseleave", () => setHover(-1));
@@ -76,7 +79,7 @@
   }
 
   // ---------- сборка метрик (KaTeX) ----------
-  let termEls = [];                       // индекс арбуза -> [DOM-элементы слагаемых]
+  let termEls = [];                       // индекс квартираа -> [DOM-элементы слагаемых]
   const KT = (tex) => (window.katex ? katex.renderToString("\\displaystyle " + tex, { throwOnError: false, trust: true, strict: false }) : tex);
   const tmpl = (rows) => `<div class="mtemplate">${rows.map(([l, t]) => `<div><span class="tag">${l}</span> ${t}</div>`).join("")}</div>`;
   function renderMetrics() {
@@ -88,35 +91,20 @@
     const sumSE = active().map((d) => `\\htmlClass{term term-${d.i} kmse}{${d.se}}`).join("+");
     const maeTex = `\\mathrm{MAE}=\\frac1n\\sum_{i=1}^{n}\\lvert y_i-\\hat y_i\\rvert=\\frac{${sumAE}}{${m.n}}=\\frac{${m.sae}}{${m.n}} ${eqA} \\htmlClass{kres kmae}{${A.s}}`;
     const mseTex = `\\mathrm{MSE}=\\frac1n\\sum_{i=1}^{n}(y_i-\\hat y_i)^2=\\frac{${sumSE}}{${m.n}}=\\frac{${m.sse}}{${m.n}} ${eqS} \\htmlClass{kres kmse}{${S.s}}`;
-    const rmseTex = `\\mathrm{RMSE}=\\sqrt{\\frac1n\\sum_{i=1}^{n}(y_i-\\hat y_i)^2}=\\sqrt{\\frac{${m.sse}}{${m.n}}}=\\sqrt{${S.s}}\\approx \\htmlClass{kres krmse}{${R.s}}`;
+    const rmseTex = `\\mathrm{RMSE}=\\sqrt{\\frac1n\\sum_{i=1}^{n}(y_i-\\hat y_i)^2}=\\sqrt{\\dfrac{${sumSE}}{${m.n}}}=\\sqrt{\\dfrac{${m.sse}}{${m.n}}}\\approx \\htmlClass{kres krmse}{${R.s}}`;
     $("#metrics").innerHTML =
       `<div class="mrow"><div class="mhead"><span class="mname mae-c">MAE</span><span class="mq">средняя абсолютная ошибка · Mean Absolute Error</span></div>` +
-        `<div class="metric-eq">${KT(maeTex)}<span class="unit mae-c">кг</span></div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "на сколько килограммов модель в среднем промахивается."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — как у таргета (кг)."],
-          ["Когда брать:", "все ошибки равноценны, в данных есть выбросы, нужна простая интерпретация."],
-          ["Ограничения:", "не отличает «много мелких» от «один крупный»; как лосс плохо дифференцируема в нуле."],
-        ]) + `</div>` +
+        `<div class="metric-eq">${KT(maeTex)}<span class="unit mae-c">млн ₽</span></div>` +
+        tmpl([["Отвечает на вопрос:", "на сколько миллионов рублей модель в среднем промахивается в цене."]]) + `</div>` +
 
       `<div class="mrow"><div class="mhead"><span class="mname mse-c">MSE</span><span class="mq">средний квадрат ошибки · Mean Squared Error</span></div>` +
-        `<div class="metric-eq">${KT(mseTex)}<span class="unit mse-c">кг²</span></div>` +
-        `<div class="mnote">Арбуз №${big.i + 1} с ошибкой <i>e</i> = ${big.e}: в сумму |e| даёт <b style="color:#10b981">${big.ae}</b>, а в сумму e² — уже <b style="color:#4f46e5">${big.se}</b>; квадрат усиливает крупные промахи.</div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "насколько велики ошибки, если крупные штрафовать особенно сильно."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — кг² (трудно интерпретировать)."],
-          ["Когда брать:", "крупные ошибки критичны; данные чистые; нужен гладкий лосс для градиентного спуска."],
-          ["Ограничения:", "единицы в квадрате; очень чувствительна к выбросам — один промах в квадрате может доминировать."],
-        ]) + `</div>` +
+        `<div class="metric-eq">${KT(mseTex)}<span class="unit mse-c">(млн ₽)²</span></div>` +
+        `<div class="mnote">Квартира №${big.i + 1} с ошибкой <i>e</i> = ${big.e}: в сумму |e| даёт <b style="color:#10b981">${big.ae}</b>, а в сумму e² — уже <b style="color:#4f46e5">${big.se}</b>; квадрат усиливает крупные промахи.</div>` +
+        tmpl([["Отвечает на вопрос:", "насколько велики ошибки, если крупные штрафовать особенно сильно (в квадрате)."]]) + `</div>` +
 
       `<div class="mrow"><div class="mhead"><span class="mname rmse-c">RMSE</span><span class="mq">корень из среднего квадрата · Root Mean Squared Error</span></div>` +
-        `<div class="metric-eq">${KT(rmseTex)}<span class="unit rmse-c">кг</span></div>` +
-        tmpl([
-          ["Отвечает на вопрос:", "какова типичная ошибка в килограммах, но с повышенным штрафом за крупные промахи."],
-          ["Диапазон:", "от 0 (идеально) и больше; единицы — как у таргета (кг), в отличие от MSE."],
-          ["Когда брать:", "нужно отчитаться в исходных единицах, но всё ещё сильнее наказывать крупные ошибки."],
-          ["Ограничения:", "чувствительна к выбросам (наследует от MSE); не различает множество мелких и один крупный промах."],
-        ]) + `</div>`;
+        `<div class="metric-eq">${KT(rmseTex)}<span class="unit rmse-c">млн ₽</span></div>` +
+        tmpl([["Отвечает на вопрос:", "какова типичная ошибка в млн ₽, но с повышенным штрафом за крупные промахи."]]) + `</div>`;
     termEls = [];
     active().forEach((d) => {
       const els = [...$("#metrics").querySelectorAll(`.term-${d.i}`)];
@@ -132,8 +120,8 @@
     const all = metricsOf(DATA), cut = metricsOf(DATA.filter((d) => d.i !== OUT));
     const o = DATA[OUT];
     $("#verdict").innerHTML = state.dropOut
-      ? `Убрали грубый промах (№${OUT + 1}) — и <b>RMSE упал с ${fmt(all.rmse)} до ${fmt(cut.rmse)} кг</b>, а <b>MAE едва дрогнул: ${fmt(all.mae)} → ${fmt(cut.mae)} кг</b>. Видишь? Квадрат «помнит» большой промах куда сильнее. Поэтому RMSE/MSE — строгие судьи, а MAE — спокойный.`
-      : `В среднем мы мажем на <b>MAE = ${fmt(all.mae)} кг</b>. Но арбуз №${OUT + 1} (мимо на ${o.ae} кг) раздувает квадраты, и <b>RMSE = ${fmt(all.rmse)} кг</b> заметно больше. Поставь галочку «убрать грубый промах» — RMSE резко просядет, а MAE почти нет.`;
+      ? `Убрали грубый промах (квартира №${OUT + 1}) — и <b>RMSE упал с ${fmt(all.rmse)} до ${fmt(cut.rmse)} млн ₽</b>, а <b>MAE едва дрогнул: ${fmt(all.mae)} → ${fmt(cut.mae)} млн ₽</b>. Квадрат «помнит» большой промах куда сильнее: RMSE/MSE — строгие судьи, а MAE — спокойный.`
+      : `В среднем модель ошибается в цене на <b>MAE = ${fmt(all.mae)} млн ₽</b>. Но квартира №${OUT + 1} (промах ${o.ae} млн ₽) раздувает квадраты, и <b>RMSE = ${fmt(all.rmse)} млн ₽</b> заметно больше. Поставь галочку «убрать грубый промах» — RMSE резко просядет, а MAE почти нет.`;
   }
 
   // ---------- подсветка (объект ↔ строка ↔ точка ↔ слагаемое), с закреплением по клику ----------
@@ -165,7 +153,7 @@
   }
   const PAD = { l: 40, r: 14, t: 16, b: 38 };
   function plot() { return { x: PAD.l, y: PAD.t, w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b }; }
-  const YMAX = 16;
+  let YMAX = 16;
   function colX(i) { const p = plot(); return p.x + (i + 0.5) / DATA.length * p.w; }
   function pyKg(v) { const p = plot(); return p.y + p.h - v / YMAX * p.h; }
   function pxPerKg() { const p = plot(); return p.h / YMAX; }
@@ -177,7 +165,7 @@
     ctx.font = "11px -apple-system, system-ui, sans-serif"; ctx.fillStyle = "#8a93a3"; ctx.strokeStyle = "rgba(20,23,28,.06)";
     ctx.textAlign = "right"; ctx.textBaseline = "middle";
     for (let v = 0; v <= YMAX; v += 4) { const Y = pyKg(v); ctx.beginPath(); ctx.moveTo(p.x, Y); ctx.lineTo(p.x + p.w, Y); ctx.stroke(); ctx.fillText(v + "", p.x - 7, Y); }
-    ctx.save(); ctx.translate(12, p.y + p.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("вес, кг", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(12, p.y + p.h / 2); ctx.rotate(-Math.PI / 2); ctx.textAlign = "center"; ctx.fillText("стоимость, млн ₽", 0, 0); ctx.restore();
 
     const sq = state.view === "squares", hi = effIndex();
     if (sq) { for (const d of DATA) if (d.i !== hi) drawSquare(d, false); if (hi >= 0) drawSquare(DATA[hi], true); }
@@ -192,9 +180,9 @@
       ctx.beginPath(); ctx.arc(X, Yy, rad, 0, 7); ctx.fillStyle = REAL_C; ctx.fill();
       ctx.beginPath(); ctx.arc(X, Yg, rad, 0, 7); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = GUESS_C; ctx.stroke();
       if (!sq && d.ae > 0 && (!small || d.i === hi)) { ctx.globalAlpha = dim ? 0.3 : 1; ctx.fillStyle = "#475569"; ctx.font = "700 11px -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(d.ae + "", X + 11, (Yg + Yy) / 2); }
-      // ось X: номер арбуза (всегда) + эмодзи
+      // ось X: номер квартираа (всегда) + эмодзи
       ctx.globalAlpha = dim ? 0.45 : 1; ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-      ctx.font = (small ? 11 : 14) + "px -apple-system, sans-serif"; ctx.fillText("🍉", X, p.y + p.h + 19);
+      ctx.font = (small ? 11 : 14) + "px -apple-system, sans-serif"; ctx.fillText("🏠", X, p.y + p.h + 19);
       ctx.fillStyle = d.i === hi ? "#14171c" : "#8a93a3"; ctx.font = (d.i === hi ? "700 " : "") + "11px -apple-system, sans-serif";
       ctx.fillText(String(d.i + 1), X, p.y + p.h + 33);
       if (d.i === state.pinned) { ctx.globalAlpha = 1; ctx.font = "13px -apple-system, sans-serif"; ctx.textBaseline = "middle"; ctx.fillText("📌", X, p.y + 11); }
@@ -239,7 +227,7 @@
 
   // ---------- кривульки: штраф MAE/MSE/RMSE от размера промаха ----------
   const cCanvas = $("#curves"), cctx = cCanvas ? cCanvas.getContext("2d") : null;
-  let CW = 0, CH = 0;
+  let CW = 0, CH = 0, curveGeom = null;
   function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
   function resizeCurves() {
     if (!cCanvas) return;
@@ -255,6 +243,7 @@
     const pts = active();
     const E = Math.max(4, ...pts.map((d) => d.ae)), ymax = E * E;
     const PX = (e) => x0 + (e + E) / (2 * E) * pw, PY = (y) => y0 + ph - Math.min(y, ymax) / ymax * ph;
+    curveGeom = { x0, pw, E };
     // ось Y + горизонтальная сетка
     cctx.font = "11px -apple-system, system-ui, sans-serif";
     cctx.fillStyle = "#8a93a3"; cctx.textAlign = "right"; cctx.textBaseline = "middle";
@@ -272,7 +261,17 @@
     cctx.font = "italic 13px Georgia, serif"; cctx.textBaseline = "middle";
     cctx.textAlign = "right"; cctx.fillStyle = "#10b981"; cctx.fillText("L = |e|", PX(E) - 4, PY(E) - 11);
     cctx.textAlign = "left"; cctx.fillStyle = "#4f46e5"; cctx.fillText("L = e²", PX(-E) + 4, PY((0.84 * E) * (0.84 * E)));
-    // наши арбузы — точки на обеих кривых при своей ошибке e
+    // маркеры «типичной ошибки» MAE и RMSE на оси (RMSE ≥ MAE из-за выброса)
+    const mm = metrics();
+    [[mm.mae, "#10b981", "MAE"], [mm.rmse, "#8b5cf6", "RMSE"]].forEach(([v, c, lbl]) => {
+      if (v > E) return;
+      const X = PX(v);
+      cctx.strokeStyle = c; cctx.lineWidth = 1.6; cctx.setLineDash([5, 4]);
+      cctx.beginPath(); cctx.moveTo(X, y0 + 14); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
+      cctx.fillStyle = c; cctx.font = "700 11px -apple-system, sans-serif"; cctx.textAlign = "center"; cctx.textBaseline = "top";
+      cctx.fillText(lbl, X, y0 + 1);
+    });
+    // наши квартиры — точки на обеих кривых при своей ошибке e
     const hi = effIndex();
     for (const d of pts) {
       const X = PX(d.e), hot = d.i === hi;
@@ -283,7 +282,7 @@
       if (hot) {
         cctx.strokeStyle = "rgba(20,23,28,.3)"; cctx.setLineDash([4, 4]); cctx.beginPath(); cctx.moveTo(X, y0); cctx.lineTo(X, y0 + ph); cctx.stroke(); cctx.setLineDash([]);
         [["#4f46e5", d.se], ["#10b981", Math.abs(d.e)]].forEach(([c, v]) => { cctx.beginPath(); cctx.arc(X, PY(v), 6, 0, 7); cctx.fillStyle = c; cctx.fill(); cctx.strokeStyle = "#fff"; cctx.lineWidth = 2; cctx.stroke(); });
-        const txt = "арбуз №" + (d.i + 1) + ":  e = " + d.e + ",  |e| = " + d.ae + ",  e² = " + d.se;
+        const txt = "квартира №" + (d.i + 1) + ":  e = " + d.e + ",  |e| = " + d.ae + ",  e² = " + d.se;
         cctx.font = "700 11px -apple-system, sans-serif"; const tw = cctx.measureText(txt).width + 16;
         let tx = X + 10; if (tx + tw > CW - 4) tx = X - tw - 10;
         cctx.fillStyle = "rgba(20,23,28,.9)"; roundRect(cctx, tx, y0 + 4, tw, 22, 7); cctx.fill();
@@ -295,6 +294,20 @@
     let lx = x0 + 8; const ly = y0 + 11;
     const leg = (c, t) => { cctx.fillStyle = c; cctx.beginPath(); cctx.arc(lx + 5, ly, 5, 0, 7); cctx.fill(); cctx.fillStyle = "#14171c"; cctx.fillText(t, lx + 14, ly); lx += 14 + cctx.measureText(t).width + 16; };
     leg("#10b981", "|e| → MAE"); leg("#4f46e5", "e² → MSE");
+  }
+  function nearestCurve(mx) {
+    if (!curveGeom) return -1;
+    const { x0, pw, E } = curveGeom, list = active();
+    const px = (e) => x0 + (e + E) / (2 * E) * pw;
+    let best = -1, bd = 1e9;
+    for (const d of list) { const dd = Math.abs(mx - px(d.e)); if (dd < bd) { bd = dd; best = d.i; } }
+    return bd < pw / Math.max(list.length, 6) ? best : -1;
+  }
+  if (cCanvas) {
+    cCanvas.style.cursor = "pointer";
+    cCanvas.addEventListener("mousemove", (e) => { const r = cCanvas.getBoundingClientRect(); setHover(nearestCurve(e.clientX - r.left)); });
+    cCanvas.addEventListener("mouseleave", () => setHover(-1));
+    cCanvas.addEventListener("click", (e) => { const r = cCanvas.getBoundingClientRect(); setPin(nearestCurve(e.clientX - r.left)); });
   }
 
   // ---------- управление ----------
@@ -314,6 +327,10 @@
   });
   $("#newData").addEventListener("click", () => {
     state.seed = (state.seed * 1103515245 + 12345) >>> 0;
+    state.dropOut = false; $("#dropOut").checked = false; rebuild();
+  });
+  $("#quality").addEventListener("input", (e) => {
+    state.quality = +e.target.value / 100;
     state.dropOut = false; $("#dropOut").checked = false; rebuild();
   });
   window.addEventListener("resize", () => { resize(); resizeCurves(); });

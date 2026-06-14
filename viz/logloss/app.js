@@ -11,8 +11,9 @@
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const fmt = (v) => (Math.round(v * 100) / 100).toFixed(2);
 
-  const state = { count: 5, seed: 7, drag: -1, hover: -1 };
+  const state = { count: 5, seed: 7, quality: 0.35, drag: -1, hover: -1, pinned: -1, shown: -1 };
   let PPL = [];   // [{sick, p}]
+  let termEls = [];   // индекс пациента -> [DOM-слагаемые в формуле]
 
   function mulberry32(a) {
     return function () {
@@ -24,9 +25,12 @@
   }
   function generate() {
     const r = mulberry32(state.seed); PPL = [];
+    const q = state.quality;                                  // 0 — хорошая модель, 1 — плохая
     for (let i = 0; i < state.count; i++) {
       const sick = r() < 0.5;
-      const p = clamp(0.06 + r() * 0.88, 0.02, 0.98);
+      // вероятность, назначенная ИСТИННОМУ классу: хорошая модель → к 1, плохая → к 0 (уверенно неправа)
+      const pCorrect = clamp(0.93 - q * 0.9 + (r() - 0.5) * 0.16, 0.02, 0.98);
+      const p = sick ? pCorrect : 1 - pCorrect;               // p = вероятность «болен»
       PPL.push({ sick, p });
     }
   }
@@ -51,6 +55,7 @@
         `<div class="pen" style="color:${penCol}">штраф ${fmt(L)}</div>`;
       el.addEventListener("mouseenter", () => setHover(i));
       el.addEventListener("mouseleave", () => setHover(-1));
+      el.addEventListener("click", () => setPin(i));
       wrap.appendChild(el); cards[i] = el;
     });
   }
@@ -67,6 +72,7 @@
         `<td>${d.sick ? 1 : 0}</td><td>${d.p.toFixed(2)}</td><td class="pen-c">${fmt(L)}</td>`;
       tr.addEventListener("mouseenter", () => setHover(i));
       tr.addEventListener("mouseleave", () => setHover(-1));
+      tr.addEventListener("click", () => setPin(i));
       tb.appendChild(tr); rows[i] = tr;
     });
     const sum = PPL.reduce((s, d) => s + loss(d), 0);
@@ -75,9 +81,19 @@
     tb.appendChild(sr);
   }
   function renderTotal() {
-    const sumStr = PPL.map((d) => fmt(loss(d))).join(" + ");
-    const tex = `\\mathrm{LogLoss}=\\frac{${sumStr}}{${PPL.length}}\\approx \\htmlClass{llres}{${fmt(total())}}`;
+    const terms = PPL.map((d, i) => `\\htmlClass{term term-${i} llpen}{${fmt(loss(d))}}`).join("+");
+    const tex = `\\mathrm{LogLoss}=\\dfrac{${terms}}{${PPL.length}}\\approx \\htmlClass{llres}{${fmt(total())}}`;
     $("#totalEq").innerHTML = KT(tex);
+    termEls = [];
+    PPL.forEach((d, i) => {
+      const els = [...document.querySelectorAll(`#totalEq .term-${i}`)];
+      termEls[i] = els;
+      els.forEach((el) => {
+        el.addEventListener("mouseenter", () => setHover(i));
+        el.addEventListener("mouseleave", () => setHover(-1));
+        el.addEventListener("click", () => setPin(i));
+      });
+    });
   }
   function renderVerdict() {
     let worst = 0; PPL.forEach((d, i) => { if (loss(d) > loss(PPL[worst])) worst = i; });
@@ -90,14 +106,21 @@
   }
 
   // ---------- подсветка ----------
-  function setHover(i) {
-    if (state.hover === i) return;
-    const off = (a) => { const el = a[state.hover]; if (el) el.classList.remove("hl"); };
-    off(cards); off(rows); state.hover = i;
-    const on = (a) => { const el = a[i]; if (el) el.classList.add("hl"); };
-    if (i >= 0) { on(cards); on(rows); }
+  function effIndex() { return state.pinned >= 0 ? state.pinned : state.hover; }
+  function applyHL(i) {
+    if (i !== state.shown) {
+      const tog = (idx, add) => {
+        if (idx < 0) return;
+        if (cards[idx]) cards[idx].classList.toggle("hl", add);
+        if (rows[idx]) rows[idx].classList.toggle("hl", add);
+        (termEls[idx] || []).forEach((e) => e.classList.toggle("hl", add));
+      };
+      tog(state.shown, false); state.shown = i; tog(i, true);
+    }
     draw();
   }
+  function setHover(i) { state.hover = i; if (state.pinned < 0) applyHL(i); }
+  function setPin(i) { state.pinned = (state.pinned === i) ? -1 : (i >= 0 ? i : -1); applyHL(effIndex()); }
 
   // ---------- график кривой штрафа ----------
   const canvas = $("#chart"), ctx = canvas.getContext("2d");
@@ -143,8 +166,9 @@
     ctx.fillStyle = HEALTHY; ctx.textAlign = "right"; ctx.fillText("здоров (y=0): −log(1−p̂)", px(0.48), py(-Math.log(1 - 0.48)) - 8);
 
     // точки-пациенты на своих кривых
+    const hi = effIndex();
     PPL.forEach((d, i) => {
-      const X = px(d.p), Y = py(loss(d)), hot = i === state.hover;
+      const X = px(d.p), Y = py(loss(d)), hot = i === hi;
       if (hot) {
         ctx.strokeStyle = "rgba(20,23,28,.25)"; ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(X, base); ctx.lineTo(X, Y); ctx.stroke();
@@ -176,12 +200,13 @@
   window.addEventListener("mouseup", () => { state.drag = -1; canvas.style.cursor = "grab"; });
 
   // ---------- обновления ----------
-  function refresh() { renderCards(); renderTable(); renderTotal(); renderVerdict(); draw(); }
-  function rebuild() { generate(); state.hover = -1; refresh(); }
+  function refresh() { renderTable(); renderTotal(); renderVerdict(); draw(); }
+  function rebuild() { generate(); state.hover = -1; state.pinned = -1; state.shown = -1; refresh(); }
   $("#count").addEventListener("input", (e) => { state.count = +e.target.value; $("#countVal").textContent = e.target.value; rebuild(); });
+  $("#quality").addEventListener("input", (e) => { state.quality = +e.target.value / 100; rebuild(); });
   $("#newData").addEventListener("click", () => { state.seed = (state.seed * 1103515245 + 12345) >>> 0; rebuild(); });
   window.addEventListener("resize", resize);
 
   // ---------- старт ----------
-  generate(); renderCards(); renderTable(); renderTotal(); renderVerdict(); resize();
+  generate(); renderTable(); renderTotal(); renderVerdict(); resize();
 })();

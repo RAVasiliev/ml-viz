@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const UP = "#0f9d58", RIGHT = "#dc2626", ACCENT = "#4f46e5";
+  const UP = "#dc2626", RIGHT = "#0f9d58", ACCENT = "#4f46e5";   // вверх = больной (красный), вправо = здоровый (зелёный)
   const $ = (s) => document.querySelector(s);
 
   const state = { count: 12, sep: 0.22, seed: 5, pinned: 0, hover: -1, timer: 0 };
@@ -105,11 +105,12 @@
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawROC();
   }
   const view = { x0: 0, x1: 1, y0: 0, y1: 1 };   // видимая область (зум)
+  const EDGE = 12;   // внутренний отступ: точки на краях (TPR=1, FPR=1) не упираются в рамку
   const plot = () => ({ x: PAD.l, y: PAD.t, w: W - PAD.l - PAD.r, h: H - PAD.t - PAD.b });
-  const X = (fpr) => { const p = plot(); return p.x + (fpr - view.x0) / (view.x1 - view.x0) * p.w; };
-  const Y = (tpr) => { const p = plot(); return p.y + p.h - (tpr - view.y0) / (view.y1 - view.y0) * p.h; };
-  const fprAt = (Xp) => { const p = plot(); return view.x0 + (Xp - p.x) / p.w * (view.x1 - view.x0); };
-  const tprAt = (Yp) => { const p = plot(); return view.y0 + (p.y + p.h - Yp) / p.h * (view.y1 - view.y0); };
+  const X = (fpr) => { const p = plot(); return p.x + EDGE + (fpr - view.x0) / (view.x1 - view.x0) * (p.w - 2 * EDGE); };
+  const Y = (tpr) => { const p = plot(); return p.y + p.h - EDGE - (tpr - view.y0) / (view.y1 - view.y0) * (p.h - 2 * EDGE); };
+  const fprAt = (Xp) => { const p = plot(); return view.x0 + (Xp - p.x - EDGE) / (p.w - 2 * EDGE) * (view.x1 - view.x0); };
+  const tprAt = (Yp) => { const p = plot(); return view.y0 + (p.y + p.h - EDGE - Yp) / (p.h - 2 * EDGE) * (view.y1 - view.y0); };
   function resetView() { view.x0 = 0; view.x1 = 1; view.y0 = 0; view.y1 = 1; }
   function clampView() {
     const wx = view.x1 - view.x0, wy = view.y1 - view.y0;
@@ -178,6 +179,14 @@
       ctx.fillStyle = ACCENT; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
     }
     ctx.restore();  // снять клип
+
+    // рамка выделения зума
+    if (state.sel && state.sel.moved) {
+      const sx = Math.min(state.sel.x0, state.sel.x1), sy = Math.min(state.sel.y0, state.sel.y1);
+      const sw = Math.abs(state.sel.x1 - state.sel.x0), sh = Math.abs(state.sel.y1 - state.sel.y0);
+      ctx.fillStyle = "rgba(79,70,229,.12)"; ctx.fillRect(sx, sy, sw, sh);
+      ctx.strokeStyle = ACCENT; ctx.lineWidth = 1.5; ctx.setLineDash([4, 3]); ctx.strokeRect(sx, sy, sw, sh); ctx.setLineDash([]);
+    }
   }
 
   // ---------- статистика ----------
@@ -197,51 +206,51 @@
     $("#note").innerHTML =
       `<b>AUC = ${AUC.toFixed(3)}</b> — площадь под лесенкой = вероятность, что случайный <b class="sick">больной</b> получит скор <b>выше</b> случайного <b class="healthy">здорового</b>. ` +
       `Двигай срез: каждый <b class="sick">красный</b> — шаг вверх (поймали), каждый <b class="healthy">зелёный</b> — шаг вправо (ложная тревога). ` +
-      `Больше людей (ползунок «Людей») → лесенка мельче и кривая глаже.`;
+      `Больше пациентов (ползунок «Пациентов») → лесенка мельче и кривая глаже.`;
   }
 
   function renderAll() { updateTable(); drawROC(); renderStats(); }
 
-  // ---------- наведение / клик / зум-пан по кривой ----------
+  // ---------- наведение / клик / зум выделением рамки ----------
   function localXY(e) { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
   function nearestPt(mx, my, rad) {
     let best = -1, bd = rad;
     for (let i = 0; i < PTS.length; i++) { const d = Math.hypot(mx - X(PTS[i].fpr), my - Y(PTS[i].tpr)); if (d < bd) { bd = d; best = i; } }
     return best;
   }
-  canvas.addEventListener("mousedown", (e) => { const [mx, my] = localXY(e); state.drag = { mx, my, v: { ...view }, moved: false }; });
+  function zoomToBox(sel) {
+    const fa = fprAt(Math.min(sel.x0, sel.x1)), fb = fprAt(Math.max(sel.x0, sel.x1));
+    const ta = tprAt(Math.max(sel.y0, sel.y1)), tb = tprAt(Math.min(sel.y0, sel.y1)); // верх пикселей = больший TPR
+    let nx0 = clamp(Math.min(fa, fb), 0, 1), nx1 = clamp(Math.max(fa, fb), 0, 1);
+    let ny0 = clamp(Math.min(ta, tb), 0, 1), ny1 = clamp(Math.max(ta, tb), 0, 1);
+    const MIN = 0.03;
+    if (nx1 - nx0 < MIN) { const c = (nx0 + nx1) / 2; nx0 = c - MIN / 2; nx1 = c + MIN / 2; }
+    if (ny1 - ny0 < MIN) { const c = (ny0 + ny1) / 2; ny0 = c - MIN / 2; ny1 = c + MIN / 2; }
+    view.x0 = nx0; view.x1 = nx1; view.y0 = ny0; view.y1 = ny1; clampView();
+  }
+  canvas.addEventListener("mousedown", (e) => {
+    const [mx, my] = localXY(e), p = plot();
+    const x = clamp(mx, p.x, p.x + p.w), y = clamp(my, p.y, p.y + p.h);
+    state.sel = { x0: x, y0: y, x1: x, y1: y, moved: false };
+  });
   window.addEventListener("mousemove", (e) => {
     const [mx, my] = localXY(e), p = plot();
-    if (state.drag) {                                   // перетаскивание = пан
-      const dx = (mx - state.drag.mx) / p.w * (state.drag.v.x1 - state.drag.v.x0);
-      const dy = (my - state.drag.my) / p.h * (state.drag.v.y1 - state.drag.v.y0);
-      if (Math.abs(mx - state.drag.mx) + Math.abs(my - state.drag.my) > 4) state.drag.moved = true;
-      view.x0 = state.drag.v.x0 - dx; view.x1 = state.drag.v.x1 - dx;
-      view.y0 = state.drag.v.y0 + dy; view.y1 = state.drag.v.y1 + dy;
-      clampView(); drawROC(); return;
+    if (state.sel) {                                    // тащим рамку выделения
+      state.sel.x1 = clamp(mx, p.x, p.x + p.w); state.sel.y1 = clamp(my, p.y, p.y + p.h);
+      if (Math.abs(state.sel.x1 - state.sel.x0) + Math.abs(state.sel.y1 - state.sel.y0) > 5) state.sel.moved = true;
+      drawROC(); return;
     }
     if (mx < p.x || mx > p.x + p.w || my < p.y || my > p.y + p.h) { if (state.hover >= 0) { state.hover = -1; renderAll(); } return; }
     const best = nearestPt(mx, my, 16);
     if (best !== state.hover) { state.hover = best; renderAll(); }
   });
-  window.addEventListener("mouseup", (e) => {
-    if (state.drag && !state.drag.moved) {              // клик без движения = выбрать точку
-      const [mx, my] = localXY(e), best = nearestPt(mx, my, 22);
-      if (best >= 0) { stopAnim(); state.pinned = best; state.hover = -1; renderAll(); }
-    }
-    state.drag = null;
+  window.addEventListener("mouseup", () => {
+    if (!state.sel) return;
+    if (state.sel.moved) zoomToBox(state.sel);
+    else { const best = nearestPt(state.sel.x0, state.sel.y0, 22); if (best >= 0) { stopAnim(); state.pinned = best; state.hover = -1; } }
+    state.sel = null; renderAll();
   });
-  canvas.addEventListener("mouseleave", () => { if (!state.drag && state.hover >= 0) { state.hover = -1; renderAll(); } });
-  canvas.addEventListener("wheel", (e) => {            // колесо = зум к курсору
-    e.preventDefault();
-    const [mx, my] = localXY(e), p = plot();
-    const f = e.deltaY < 0 ? 0.82 : 1.22;
-    const wx = clamp((view.x1 - view.x0) * f, 0.03, 1), wy = clamp((view.y1 - view.y0) * f, 0.03, 1);
-    const fx = fprAt(mx), fy = tprAt(my);
-    view.x0 = fx - (mx - p.x) / p.w * wx; view.x1 = view.x0 + wx;
-    view.y0 = fy - (p.y + p.h - my) / p.h * wy; view.y1 = view.y0 + wy;
-    clampView(); drawROC();
-  }, { passive: false });
+  canvas.addEventListener("mouseleave", () => { if (!state.sel && state.hover >= 0) { state.hover = -1; renderAll(); } });
   canvas.addEventListener("dblclick", () => { resetView(); drawROC(); });
 
   // ---------- анимация ----------
