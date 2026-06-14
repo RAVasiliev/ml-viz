@@ -308,6 +308,20 @@
     cctx.fillStyle = "#4f46e5"; cctx.textBaseline = "bottom"; cctx.fillText("MSE (млн ₽)²", x0 + pw - 5, PY(MSEf(E)) - 5);
     cctx.fillStyle = "#8b5cf6"; cctx.textBaseline = "bottom"; cctx.fillText("RMSE млн ₽", x0 + pw - 5, PY(RMSEf(E)) - 5);
     cctx.fillStyle = "#10b981"; cctx.textBaseline = "top"; cctx.fillText("MAE млн ₽", x0 + pw - 5, PY(MAEf(E)) + 5);
+    // ── точки выборки: каждая квартира на трёх кривых при своей ошибке e_i ──
+    // (значение метрики, если бы ошибся только этот объект; на MSE-кривой крупный промах
+    //  забирается высоко — виден огромный вклад квадрата). Наведение на строку таблицы подсвечивает.
+    const hiC = effIndex();
+    for (const d of active()) {
+      if (Math.abs(d.e) > E) continue;
+      const X = PX(d.e), hot = d.i === hiC;
+      [[MSEf, "#4f46e5"], [RMSEf, "#8b5cf6"], [MAEf, "#10b981"]].forEach(([fn, col]) => {
+        const v = fn(d.e); if (v > ymax) return;
+        cctx.beginPath(); cctx.arc(X, PY(v), hot ? 5 : 3.3, 0, 7);
+        cctx.globalAlpha = hot ? 1 : 0.6; cctx.fillStyle = col; cctx.fill(); cctx.globalAlpha = 1;
+        cctx.strokeStyle = "#fff"; cctx.lineWidth = hot ? 2 : 1; cctx.stroke();
+      });
+    }
     // ── ховер: вертикаль + точки на трёх кривых + ПАНЕЛЬ С ТРЕМЯ МЕТРИКАМИ (меняются с e) ──
     if (hoverE != null) {
       const e = Math.max(-E, Math.min(E, hoverE)), X = PX(e);

@@ -136,12 +136,11 @@
 
     <div class="verdict" id="verdict" style="margin-top:14px"></div>
 
-    <div class="section-title">Как растут метрики с ошибкой: почему MSE наказывает сильнее</div>
-    <p class="hint-inline" style="margin:0 0 8px;font-size:13px">Модель точна, кроме одного объекта — у него ошибка <i>e</i> (ось X). Три кривые: как от этого растут метрики. <b style="color:#4f46e5">MSE</b> взлетает квадратично (потому и «наказывает сильнее»), <b style="color:#8b5cf6">RMSE = √MSE</b> мягче, <b style="color:#10b981">MAE</b> почти не дрогнет — усреднение гасит одиночный промах. При <i>e</i> = 0 все метрики = 0. Наведи — во всплывающей панели три значения <b style="color:#10b981">MAE</b>, <b style="color:#4f46e5">MSE</b>, <b style="color:#8b5cf6">RMSE</b> для этой ошибки.</p>
+    <div class="section-title">Как одна ошибка влияет на метрики</div>
     <div class="curve-host"><canvas id="curves"></canvas></div>
   </main>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
   <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.dataset.block!=null});}catch(err){}});</script>
 </body>
 </html>
