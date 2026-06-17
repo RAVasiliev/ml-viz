@@ -38,8 +38,24 @@
       if (x < 0.72) return 0.40;
       return 0.84;
     },
+    sawtooth(x) {
+      // пила: три наклонных рампы с резкими обрывами
+      return 0.15 + 0.7 * ((x * 3) % 1);
+    },
+    bump(x) {
+      // локальный всплеск на плоском фоне — бустинг «нацеливается» на один регион
+      return 0.2 + 0.66 * Math.exp(-Math.pow((x - 0.55) / 0.085, 2));
+    },
+    sigmoid(x) {
+      // гладкая, но резкая ступень (логистическая)
+      return 0.16 + 0.68 / (1 + Math.exp(-16 * (x - 0.45)));
+    },
+    doublebump(x) {
+      // две горки разной ширины
+      return 0.18 + 0.5 * Math.exp(-Math.pow((x - 0.3) / 0.08, 2)) + 0.56 * Math.exp(-Math.pow((x - 0.74) / 0.06, 2));
+    },
     wave(x) {
-      // зашумлённая кривая: затухающая синусоида + наклон
+      // затухающая синусоида + наклон
       return 0.5 + 0.30 * Math.sin(3.4 * Math.PI * x) * (1 - 0.5 * x) + 0.12 * x;
     },
   };
@@ -148,8 +164,23 @@
     this.lastResid = null;     // остатки, по которым фитилось последнее дерево
     this.lastTree = null;      // последнее дерево
     this.mseHistory = [this._mse()]; // train-MSE: индекс 0 — до деревьев (только F0)
+
+    // отложенная (тестовая) выборка — не участвует в обучении, нужна для честной ошибки
+    this.xt = opts.xt || null;
+    this.yt = opts.yt || null;
+    this.nt = this.xt ? this.xt.length : 0;
+    this.Ft = this.nt ? new Float64Array(this.nt).fill(this.F0) : null;
+    this.mseTestHistory = this.nt ? [this._mseTest()] : [];
+
     this.done = false;
   }
+
+  BoostStepper.prototype._mseTest = function () {
+    if (!this.nt) return NaN;
+    let s = 0;
+    for (let i = 0; i < this.nt; i++) { const e = this.yt[i] - this.Ft[i]; s += e * e; }
+    return s / this.nt;
+  };
 
   BoostStepper.prototype._mse = function () {
     let s = 0;
@@ -167,10 +198,13 @@
     const t = buildTree(this.x, resid, this.maxDepth, this.minLeaf);
     // обновляем ансамбль: F ← F + eta · tree(x)
     for (let i = 0; i < this.n; i++) this.F[i] += this.eta * treePredict(t.root, this.x[i]);
+    // то же на тестовой выборке (для честной ошибки)
+    if (this.nt) { for (let i = 0; i < this.nt; i++) this.Ft[i] += this.eta * treePredict(t.root, this.xt[i]); }
     this.trees.push(t.root);
     this.lastResid = resid;
     this.lastTree = t.root;
     this.mseHistory.push(this._mse());
+    if (this.nt) this.mseTestHistory.push(this._mseTest());
     if (this.target > 0 && this.trees.length >= this.target) this.done = true;
   };
 
@@ -187,10 +221,11 @@
   };
 
   BoostStepper.prototype.stats = function () {
-    const h = this.mseHistory;
+    const h = this.mseHistory, ht = this.mseTestHistory;
     return {
       nTrees: this.trees.length,
       mse: h[h.length - 1],
+      mseTest: this.nt ? ht[ht.length - 1] : NaN,
       done: this.done,
     };
   };
@@ -200,8 +235,12 @@
     BoostStepper,
     targets: [
       { id: "sine", name: "Синус" },
+      { id: "sawtooth", name: "Пила" },
       { id: "steps", name: "Ступеньки" },
-      { id: "wave", name: "Зашумлённая кривая" },
+      { id: "bump", name: "Всплеск" },
+      { id: "sigmoid", name: "Сигмоида" },
+      { id: "doublebump", name: "Две горки" },
+      { id: "wave", name: "Волна с затуханием" },
     ],
   };
 })();

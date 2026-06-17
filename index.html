@@ -173,12 +173,24 @@
             <path d="M0 66 Q70 26 140 62 T280 56" fill="none" stroke="#4f46e5" stroke-opacity=".4" stroke-width="2"/>
             <circle cx="70" cy="40" r="4" fill="#4f46e5"/><circle cx="110" cy="30" r="4" fill="#4f46e5"/><circle cx="180" cy="95" r="4" fill="#10b981"/><circle cx="220" cy="100" r="4" fill="#10b981"/>
           </svg></div>
-          <div class="card-body"><h3>Random Forest — случайный лес <span class="badge soon">В разработке</span></h3><p>Bootstrap + случайные признаки: зубчатые деревья → гладкая граница ансамбля.</p></div>
+          <div class="card-body"><h3>Random Forest — случайный лес <span class="badge ready">Готово</span></h3><p>Bootstrap + случайная горстка признаков: одно дерево зубчатое, зал из десятков — гладкая граница. Кривая train/OOB-точности выходит на плато.</p></div>
         </a>
-        <div class="card soon">
-          <div class="thumb"><svg viewBox="0 0 280 132"><path d="M20 100 Q80 90 130 60 T260 35" stroke="#cbd5e1" stroke-width="2" fill="none"/><circle cx="60" cy="95" r="4" fill="#94a3b8"/><circle cx="130" cy="60" r="4" fill="#94a3b8"/><circle cx="200" cy="45" r="4" fill="#94a3b8"/></svg></div>
-          <div class="card-body"><h3>Градиентный бустинг <span class="badge soon">Скоро</span></h3><p>Последовательное исправление остатков, learning rate.</p></div>
-        </div>
+        <a class="card ready" href="viz/boosting/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M10 96 Q75 26 140 52 T272 78" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="4 4" fill="none"/>
+            <path d="M10 92 H52 V62 H92 V42 H140 V52 H190 V70 H232 V84 H272" stroke="#4f46e5" stroke-width="2.6" fill="none"/>
+            <circle cx="42" cy="86" r="3.5" fill="#1f2937"/><circle cx="84" cy="56" r="3.5" fill="#1f2937"/><circle cx="150" cy="46" r="3.5" fill="#1f2937"/><circle cx="212" cy="76" r="3.5" fill="#1f2937"/>
+            <line x1="42" y1="86" x2="42" y2="92" stroke="#ef4444" stroke-width="2"/><line x1="150" y1="46" x2="150" y2="52" stroke="#ef4444" stroke-width="2"/></svg></div>
+          <div class="card-body"><h3>Градиентный бустинг <span class="badge ready">Готово</span></h3><p>Деревья последовательно фитят остатки: F ← F + η·дерево. Видно, как тает train-MSE и из ступенек собирается кривая.</p></div>
+        </a>
+        <a class="card ready" href="viz/boosting-clf/index.html">
+          <div class="thumb"><svg viewBox="0 0 280 132" preserveAspectRatio="xMidYMid slice">
+            <path d="M0 0 H150 V70 H280 V0 Z" fill="#4f46e5" opacity=".12"/><path d="M0 70 H150 V132 H0 Z M150 70 H280 V132 H150 Z" fill="#ef4444" opacity=".12"/>
+            <path d="M150 0 V70 H280" fill="none" stroke="#14171c" stroke-width="2"/>
+            <circle cx="60" cy="32" r="4" fill="#4f46e5"/><circle cx="105" cy="46" r="4" fill="#4f46e5"/><circle cx="40" cy="55" r="6.5" fill="#4f46e5"/>
+            <rect x="76" y="92" width="8" height="8" fill="#ef4444"/><rect x="170" y="40" width="13" height="13" fill="#ef4444"/><rect x="210" y="98" width="8" height="8" fill="#ef4444"/><rect x="120" y="104" width="8" height="8" fill="#ef4444"/></svg></div>
+          <div class="card-body"><h3>Бустинг для классификации <span class="badge ready">Готово</span></h3><p>AdaBoost: пни-разрезы и веса объектов — ошибочные точки тяжелеют, следующий пень целится в них. Взвешенная сумма → ступенчатая граница.</p></div>
+        </a>
       </div>
     </section>
 

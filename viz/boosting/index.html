@@ -6,17 +6,40 @@
   <title>Градиентный бустинг — ML-виз</title>
   <link rel="stylesheet" href="../../assets/css/main.css" />
   <link rel="stylesheet" href="../../assets/css/viz.css" />
+  <link rel="stylesheet" href="../../assets/vendor/katex/katex.min.css" />
+  <script src="../../assets/vendor/katex/katex.min.js"></script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Ccircle cx='10' cy='12' r='3' fill='%23fff'/%3E%3Ccircle cx='21' cy='10' r='3' fill='%230ea5e9'/%3E%3Ccircle cx='16' cy='22' r='3' fill='%2310b981'/%3E%3C/svg%3E" />
   <style>
-    /* нижняя под-панель: переключатель «что показывать» */
-    .subhead { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 2px 7px; }
-    .seg { display:inline-flex; border:1px solid var(--line-strong); border-radius:8px; overflow:hidden; }
-    .seg button {
-      font:inherit; font-size:12px; font-weight:600; color:var(--muted);
-      padding:5px 11px; border:none; background:var(--surface); cursor:pointer;
-    }
-    .seg button + button { border-left:1px solid var(--line); }
-    .seg button.on { background:var(--accent); color:#fff; }
+    .lab-head p.lead { font-size:14.5px; line-height:1.55; color:var(--muted); max-width:none; }
+    .lead b { color:var(--ink); font-weight:650; }
+
+    /* каты с теорией */
+    .cats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0 4px; }
+    @media (max-width:820px){ .cats { grid-template-columns:1fr; } }
+    .cat { border:1px solid var(--line); border-radius:11px; background:var(--surface); box-shadow:var(--shadow-sm); }
+    .cat > summary { cursor:pointer; padding:11px 15px; font-weight:650; font-size:14px; list-style:none; display:flex; align-items:center; gap:9px; }
+    .cat > summary::-webkit-details-marker { display:none; }
+    .cat > summary::before { content:"▸"; color:var(--accent); font-size:12px; transition:transform .15s; }
+    .cat[open] > summary::before { transform:rotate(90deg); }
+    .cat .cb { padding:0 16px 14px; font-size:13.5px; line-height:1.6; color:var(--muted); }
+    .cat .cb b { color:var(--ink); }
+    .cat .cb code { font-family:var(--mono); font-size:12.5px; background:var(--surface-2); border:1px solid var(--line); border-radius:5px; padding:0 5px; color:var(--ink); }
+    .cat .cb .katex { color:var(--ink); }
+    .kf { display:block; margin:8px 0; overflow-x:auto; overflow-y:hidden; }
+    .kf .katex { font-size:1.04em; }
+
+    /* две постоянные панели под главным холстом: дерево + train-MSE */
+    .subgrid { display:grid; grid-template-columns:1.15fr 0.85fr; gap:16px; margin-top:16px; }
+    @media (max-width:860px){ .subgrid { grid-template-columns:1fr; } }
+    .sublabel { font-size:12px; color:var(--faint); font-weight:600; margin:0 2px 7px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+    .sublabel b { color:var(--ink); }
+    .sublabel .subnote { font-weight:500; color:var(--faint); }
+    .sublabel code { font-family:var(--mono); font-size:11.5px; background:var(--surface-2); border:1px solid var(--line); border-radius:4px; padding:0 4px; color:var(--muted); }
+    .pan { background:var(--surface-2); border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+    .pan canvas { display:block; width:100%; height:100%; }
+
+    .note-box { background:#f6f5ff; border:1px solid #e2def8; border-radius:12px; padding:13px 16px; margin-top:14px; font-size:13.5px; line-height:1.55; color:#3730a3; }
+    .note-box b { color:#1e1b4b; }
   </style>
 </head>
 <body>
@@ -30,14 +53,47 @@
     </div>
   </header>
 
-  <main class="lab">
+  <main class="lab" style="max-width:1180px">
     <div class="lab-head">
-      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Деревья · Градиентный бустинг</div>
-      <h1>Градиентный бустинг (1D-регрессия)</h1>
-      <p>Деревья строятся <b>последовательно</b>: начинаем с константы <code>F₀ = mean(y)</code>, дальше каждое новое дерево фитит <b>остатки</b> <code>rᵢ = yᵢ − F(xᵢ)</code> — для MSE это и есть антиградиент. Ансамбль обновляется маленьким шагом: <code>F(x) ← F(x) + η·tree(x)</code>. Это <b>«стрельба по лунке»</b>: каждое неглубокое дерево чуть-чуть подталкивает кривую к таргету. Следи, как падает <b>train-MSE</b> и как ансамбль из ступенек собирает гладкую зависимость.</p>
+      <div class="crumbs"><a href="../../index.html">ML-виз</a> · Ансамбли · Градиентный бустинг</div>
+      <h1>Градиентный бустинг</h1>
+      <p class="lead">Деревья строятся <b>последовательно</b>, и каждое чинит то, что не доделали предыдущие. Старт — константа <span class="kf" style="display:inline" data-tex="F_0=\overline{y}"></span>. Дальше считаем <b>остатки</b> <span class="kf" style="display:inline" data-tex="r_i=y_i-F_{k-1}(x_i)"></span> (для квадратичной потери это <b>антиградиент</b>) и фитим по ним новое <b>неглубокое</b> дерево. Ансамбль обновляем маленьким шагом <span class="kf" style="display:inline" data-tex="\eta"></span>: <span class="kf" style="display:inline" data-tex="F\leftarrow F+\eta\,h(x)"></span>. Слабые деревья по очереди подталкивают ломаную к данным — следи, как растёт само <b>дерево</b>, тает <b>train-MSE</b> и из ступенек собирается гладкая зависимость.</p>
     </div>
 
-    <div class="lab-grid">
+    <div class="cats">
+      <details class="cat">
+        <summary>Идея: чиним остатки</summary>
+        <div class="cb">
+          На шаге <span class="kf" style="display:inline" data-tex="k"></span> смотрим, насколько текущий ансамбль <span class="kf" style="display:inline" data-tex="F_{k-1}"></span> промахивается на каждом объекте, — это остаток:
+          <span class="kf" data-tex="r_i=y_i-F_{k-1}(x_i)=-\left.\frac{\partial \tfrac12(y_i-F)^2}{\partial F}\right|_{F=F_{k-1}}" data-block></span>
+          Новое дерево <span class="kf" style="display:inline" data-tex="h_k"></span> учится предсказывать именно эти остатки (в каждом листе — <b>средний остаток</b> попавших туда точек), и мы прибавляем его к ансамблю с шагом <span class="kf" style="display:inline" data-tex="\eta"></span>:
+          <span class="kf" data-tex="F_k(x)=F_{k-1}(x)+\eta\,h_k(x)" data-block></span>
+          Для MSE остаток и есть антиградиент — отсюда «<b>градиентный</b>» бустинг.
+        </div>
+      </details>
+      <details class="cat">
+        <summary>Learning rate η — усадка (shrinkage)</summary>
+        <div class="cb">
+          <span class="kf" style="display:inline" data-tex="\eta"></span> — длина шага в правильном направлении, обычно <span class="kf" style="display:inline" data-tex="0<\eta\ll1"></span>. Маленький <span class="kf" style="display:inline" data-tex="\eta"></span> + <b>много</b> деревьев — это регуляризация (<b>усадка</b>): модель приближается к данным аккуратно и меньше переобучается. Крупный <span class="kf" style="display:inline" data-tex="\eta"></span> сходится за единицы деревьев, но рискует «перелетать» и ловить шум. Ставь <span class="kf" style="display:inline" data-tex="\eta\approx0.1"></span> и компенсируй числом деревьев.
+        </div>
+      </details>
+      <details class="cat">
+        <summary>Слабые ученики</summary>
+        <div class="cb">
+          Базовые деревья делают <b>неглубокими</b> (<code>depth</code> 1–3, «<b>пни</b>» и пара уровней). Поодиночке они слабы — грубые ступеньки. Но бустинг складывает их сотнями, и сумма <span class="kf" style="display:inline" data-tex="F=F_0+\eta\sum_k h_k"></span> выходит гибкой и точной. В отличие от леса, где деревья глубокие и независимые, здесь они <b>мелкие и зависимые</b> — каждое опирается на ошибки предыдущих.
+        </div>
+      </details>
+      <details class="cat">
+        <summary>Бустинг и лес — в чём разница</summary>
+        <div class="cb">
+          <b>Лес</b>: глубокие деревья учатся <b>параллельно</b> и независимо, голосование гасит их <b>дисперсию</b>. <b>Бустинг</b>: слабые деревья учатся <b>последовательно</b>, каждое уменьшает <b>смещение</b> предыдущей суммы. Поэтому бустинг точнее на сложных зависимостях, но <b>чувствителен к переобучению</b>: при слишком большом числе деревьев train-MSE всё падает, а модель начинает повторять <b>шум</b> (включи шум и много деревьев — увидишь дрожь кривой).
+        </div>
+      </details>
+    </div>
+
+    <div class="io-hint"><span class="ic">🖐</span><span><b>Интерактивно:</b> жми <b>«Дерево ⏭»</b> или <b>«Запуск»</b> — деревья добавляются по одному. Внизу слева растёт <b>само дерево шага</b> (сплиты и листья), справа — <b>кривая train-MSE</b>.</span></div>
+
+    <div class="lab-grid" style="margin-top:10px">
       <aside class="panel">
         <div class="control">
           <label for="target">Зависимость y(x)</label>
@@ -48,7 +104,7 @@
           <input type="range" id="points" min="30" max="300" step="10" value="120" />
         </div>
         <div class="control">
-          <label for="noise">Шум <span class="val" id="noiseVal">0.06</span></label>
+          <label for="noise">Шум σ <span class="val" id="noiseVal">0.06</span></label>
           <input type="range" id="noise" min="0" max="20" step="1" value="6" />
           <div class="hint">σ гауссова шума, добавленного к истинной y(x).</div>
         </div>
@@ -60,7 +116,7 @@
         <div class="control">
           <label for="depth">Глубина дерева <span class="val" id="depthVal">2</span></label>
           <input type="range" id="depth" min="1" max="3" step="1" value="2" />
-          <div class="hint">Неглубокие деревья («слабые ученики»): 1 = пень, 2–3 = пара уровней.</div>
+          <div class="hint">Неглубокие «слабые ученики»: 1 = пень, 2–3 = пара уровней.</div>
         </div>
         <div class="control">
           <label for="nest">n_estimators (цель) <span class="val" id="nestVal">60</span></label>
@@ -84,40 +140,44 @@
         <div class="control">
           <div class="stats">
             <div class="stat"><div class="num" id="statTrees">0</div><div class="lbl">деревьев</div></div>
-            <div class="stat"><div class="num" id="statMSE">—</div><div class="lbl">train-MSE</div></div>
             <div class="stat"><div class="num" id="statEta" style="color:#4f46e5">0.30</div><div class="lbl">η</div></div>
-            <div class="stat"><div class="num" id="statDepth">2</div><div class="lbl">глубина</div></div>
+            <div class="stat"><div class="num" id="statMSE" style="color:#4f46e5">—</div><div class="lbl">train-MSE</div></div>
+            <div class="stat"><div class="num" id="statMSEt" style="color:#ea8a1e">—</div><div class="lbl">test-MSE</div></div>
           </div>
           <div class="progress"><span id="progressBar"></span></div>
         </div>
       </aside>
 
       <section class="stage">
-        <div class="canvas-host" style="aspect-ratio:auto;height:430px">
+        <div class="canvas-host" style="aspect-ratio:auto;height:360px">
           <canvas id="canvas"></canvas>
-          <div class="canvas-hint">серый пунктир — истинная y(x), фиолетовая ступенчатая — ансамбль F(x)</div>
+          <div class="canvas-hint">тёмные точки — train, оранжевые кольца — test; серый пунктир — y(x), фиолетовая ломаная — F(x), красные чёрточки — остатки, тонкие вертикали — сплиты дерева</div>
         </div>
-        <div class="dendro-wrap">
-          <div class="subhead">
-            <div class="dendro-label" id="subLabel">Предсказание последнего дерева по остаткам</div>
-            <div class="seg">
-              <button id="modeTree" class="on">дерево</button>
-              <button id="modeMse">train-MSE</button>
-            </div>
+
+        <div class="subgrid">
+          <div class="subcol">
+            <div class="sublabel">Дерево <b id="treeNo">—</b>, которое строится сейчас <span class="subnote">узлы — сплит <code>x ≤ t</code>, листья — средний остаток</span></div>
+            <div class="pan" style="height:236px"><canvas id="tree"></canvas></div>
           </div>
-          <div class="dendro-host" style="height:190px"><canvas id="sub"></canvas></div>
+          <div class="subcol">
+            <div class="sublabel">train / test-MSE по числу деревьев <span class="subnote">тест ловит переобучение</span></div>
+            <div class="pan" style="height:236px"><canvas id="mse"></canvas></div>
+          </div>
         </div>
+
         <div class="legend">
           <span><i class="dot" style="background:#4f46e5"></i> ансамбль F(x)</span>
           <span><i class="dot" style="background:#94a3b8"></i> истинная y(x)</span>
+          <span><i class="dot" style="background:#1f2937"></i> train · <i class="dot" style="background:#fff;box-shadow:inset 0 0 0 2px #ea8a1e"></i> test</span>
           <span><i class="dot" style="background:#ef4444"></i> остатки rᵢ</span>
-          <span style="color:var(--faint)">точки — обучающая выборка (x, y)</span>
         </div>
+        <div class="note-box" id="note"></div>
       </section>
     </div>
   </main>
 
-  <script src="boosting.js"></script>
-  <script src="app.js"></script>
+  <script src="boosting.js?v=2"></script>
+  <script src="app.js?v=3"></script>
+  <script>document.querySelectorAll('.kf[data-tex]').forEach(function(e){try{katex.render(e.dataset.tex,e,{throwOnError:false,displayMode:e.hasAttribute('data-block'),strict:false});}catch(err){}});</script>
 </body>
 </html>
